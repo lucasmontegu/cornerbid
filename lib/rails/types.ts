@@ -24,7 +24,8 @@ export interface CreateIntentInput {
    * already committed. Defaults to `quotedAmountCents`.
    */
   chargeAmountCents?: number;
-  email: string;
+  /** Optional — Polar and Mercado Pago collect email on the hosted checkout. */
+  email?: string;
   displayName: string;
   identityKey: string;
   expectedVersion: number;

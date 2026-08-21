@@ -31,7 +31,6 @@ export function BidSheet({
 }: BidSheetProps) {
   const { t } = useI18n()
   const [input, setInput] = useState('')
-  const [email, setEmail] = useState('')
   const [amountCents, setAmountCents] = useState(quoteAmountCents)
   const [amountDraft, setAmountDraft] = useState(dollarsFromCents(quoteAmountCents))
   const [preview, setPreview] = useState<IdentityPreview | null>(null)
@@ -124,7 +123,6 @@ export function BidSheet({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           input,
-          email,
           expectedAmountCents: cents,
           country: argentine ? 'AR' : undefined,
           timeZone,
@@ -257,26 +255,42 @@ export function BidSheet({
             {reserved ? <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{t('reserved')}</p> : null}
           </div>
 
-          <div className="mx-auto mt-6 flex w-full max-w-xl items-center gap-2">
-            <label className="relative min-w-0 flex-1">
+          <div className="mx-auto mt-6 flex w-full max-w-xl items-stretch gap-2">
+            <label
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-brand/35 bg-paper ps-3 pe-4 shadow-[var(--shadow-border)] transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-brand"
+              style={{ height: BID_ROW_HEIGHT_PX }}
+            >
               <span className="sr-only">{t('productLabel')}</span>
-              <span className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-hush">
-                <HugeiconsIcon icon={Globe02Icon} size={18} strokeWidth={1.5} />
+              <span className="pointer-events-none flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-mist text-hush">
+                {preview?.imageUrl ? (
+                  // Hotlinked third-party favicon / avatar — never next/image (D4).
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={preview.imageUrl}
+                    alt=""
+                    width={28}
+                    height={28}
+                    className="size-7 object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
+                  />
+                ) : (
+                  <HugeiconsIcon icon={Globe02Icon} size={16} strokeWidth={1.5} />
+                )}
               </span>
               <input
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 placeholder={t('productPlaceholder')}
-                className="h-12 w-full rounded-full border border-line bg-paper pe-4 ps-10 text-sm text-ink shadow-[var(--shadow-border)] outline-none transition-[box-shadow,border-color] duration-150 ease-out focus-visible:border-ink"
+                className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && input && email && !busy) onPayClick()
+                  if (event.key === 'Enter' && input && !busy) onPayClick()
                 }}
               />
             </label>
             <button
               type="button"
-              className="h-12 shrink-0 rounded-full bg-brand px-6 text-sm font-semibold text-white transition-[scale,background-color] duration-150 ease-out hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:scale-[0.96] disabled:opacity-50"
-              disabled={busy || !email || !input || chargeCents <= 0}
+              className="shrink-0 rounded-full bg-brand px-5 text-sm font-semibold whitespace-nowrap text-white transition-[scale,background-color] duration-150 ease-out hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:scale-[0.96] disabled:opacity-50 sm:px-6"
+              style={{ height: BID_ROW_HEIGHT_PX }}
+              disabled={busy || !input || chargeCents <= 0}
               onClick={onPayClick}
             >
               {busy
@@ -288,42 +302,14 @@ export function BidSheet({
           </div>
 
           <p className="mx-auto mt-2 max-w-xl text-center text-[11px] text-hush">{t('raiseHint')}</p>
-
-          {preview ? (
-            <div className="mx-auto mt-4 flex max-w-xl items-center gap-3 rounded-2xl bg-mist p-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={preview.imageUrl}
-                alt=""
-                width={48}
-                height={48}
-                className="size-12 object-contain outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
-              />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-ink">{preview.displayName}</p>
-                <p className="truncate font-mono text-[11px] text-hush">{preview.key}</p>
-                {committed > 0 ? (
-                  <p className="text-[11px] text-brand">
-                    {t('alreadyCommitted', {
-                      paid: formatUsd(committed),
-                      delta: formatUsd(chargeCents),
-                    })}
-                  </p>
-                ) : null}
-              </div>
-            </div>
+          {committed > 0 ? (
+            <p className="mx-auto mt-1 max-w-xl text-center text-[11px] text-brand">
+              {t('alreadyCommitted', {
+                paid: formatUsd(committed),
+                delta: formatUsd(chargeCents),
+              })}
+            </p>
           ) : null}
-
-          <label className="mx-auto mt-4 block max-w-xl text-xs text-hush">
-            {t('receiptEmail')}
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@domain.com"
-              className="mt-1 h-11 w-full rounded-2xl border border-line bg-paper px-3 text-sm text-ink outline-none focus-visible:border-ink"
-            />
-          </label>
 
           {message ? <p className="mx-auto mt-3 max-w-xl text-xs text-red-600">{message}</p> : null}
 

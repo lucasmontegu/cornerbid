@@ -42,7 +42,6 @@ export const messages = {
     raiseHint:
       'Already occupying or listed? Enter the same URL or @handle and pay only the difference to stay longer.',
     alreadyCommitted: 'Already committed {paid} · pay {delta} more',
-    receiptEmail: 'Email for the receipt',
     redirecting: 'Redirecting…',
     takeCornerPay: 'Take the bounce · {price}',
     placeOnBoard: 'List on the board · {price}',
@@ -158,7 +157,6 @@ export const messages = {
     raiseHint:
       '¿Ya ocupás o estás listado? Poné la misma URL o @handle y pagás solo la diferencia para quedarte más tiempo.',
     alreadyCommitted: 'Ya comprometiste {paid} · pagás {delta} más',
-    receiptEmail: 'Email para el comprobante',
     redirecting: 'Redirigiendo…',
     takeCornerPay: 'Tomá el rebote · {price}',
     placeOnBoard: 'Listate en el ranking · {price}',

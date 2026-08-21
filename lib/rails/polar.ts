@@ -45,7 +45,7 @@ export const polarRail: PaymentRail = {
       // Only honoured because the product uses custom (pay-what-you-want) pricing.
       // Raise-by-difference charges the delta; metadata still carries the slot total.
       amount: input.chargeAmountCents ?? input.quotedAmountCents,
-      customerEmail: input.email,
+      ...(input.email ? { customerEmail: input.email } : {}),
       successUrl: `${appUrl}/success?checkout_id={CHECKOUT_ID}`,
       metadata: {
         bid_id: input.bidId,

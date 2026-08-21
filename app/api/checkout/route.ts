@@ -22,7 +22,7 @@ import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit';
 
 const CheckoutRequest = z.object({
   input: z.string().min(1).max(300),
-  email: z.email(),
+  email: z.email().optional(),
   expectedAmountCents: z.number().int().min(MIN_PLACE_CENTS).max(99_999_999_00),
   country: z.string().length(2).optional(),
   timeZone: z.string().max(80).optional(),
@@ -43,6 +43,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Invalid request' }, { status: 400 });
   }
   const { input, email, expectedAmountCents, country, timeZone, rail } = parsedBody.data;
+  const receiptEmail = email ?? '';
 
   const parsedIdentity = parseIdentityInput(input);
   if (!parsedIdentity) {
@@ -101,7 +102,7 @@ export async function POST(request: Request): Promise<Response> {
         displayName: resolved.displayName,
         description: resolved.description,
         imageUrl: resolved.imageUrl,
-        email,
+        email: receiptEmail,
         status: 'pending',
       })
       .onConflictDoUpdate({
@@ -111,7 +112,7 @@ export async function POST(request: Request): Promise<Response> {
           description: resolved.description,
           imageUrl: resolved.imageUrl,
           sourceUrl: resolved.sourceUrl,
-          email,
+          ...(receiptEmail ? { email: receiptEmail } : {}),
         },
       })
       .returning();
@@ -133,7 +134,7 @@ export async function POST(request: Request): Promise<Response> {
       bidId,
       quotedAmountCents: expectedAmountCents,
       chargeAmountCents,
-      email,
+      email: receiptEmail || undefined,
       displayName: resolved.displayName,
       identityKey: resolved.key,
       expectedVersion,
