@@ -1,5 +1,6 @@
 export type Locale = 'en' | 'es';
 
+/** Legacy cookie — never read. Cleared on the client so it cannot pin English. */
 export const LOCALE_COOKIE = 'cornerbid-locale';
 
 export const messages = {
@@ -53,18 +54,8 @@ export const messages = {
     raiseBid: 'Raise bid',
     bidFineprint:
       'Paying more buys occupancy, not faster physics. Time on the slot is how your logo racks up corner touches. If someone outbids you, you lose the bounce but stay on the board — that charge is not refunded. A visit counts when someone opens your site from the corner modal.',
-    railStepTitle: 'How do you want to pay?',
-    railStepBody:
-      'Polar is the default worldwide. If you are in Argentina, you can pay with Mercado Pago Checkout Pro instead.',
-    railPolar: 'Polar (default)',
-    railPolarHint: 'Card / wallet. Works worldwide.',
-    railMp: 'Mercado Pago',
-    railMpHint: 'Checkout Pro for Argentina. You can still pick Polar.',
-    railContinue: 'Continue to payment',
-    railBack: 'Back',
-    railEscape: 'Pay with Mercado Pago (Argentina)',
     mpCredentialsMissing:
-      'Mercado Pago credentials are missing. Set MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET, and MP_USD_ARS_RATE.',
+      'Mercado Pago credentials are missing. Set MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET, MP_USD_ARS_RATE, and NEXT_PUBLIC_APP_URL.',
     hitTheCorner: 'It hit the corner',
     celebrateStats: '{touches} touches · {visits} visits',
     successKicker: 'Payment received',
@@ -118,7 +109,8 @@ export const messages = {
     rulesAfter2:
       'A touch is recorded when the screensaver hits a corner. A visit is recorded only when someone goes through the corner modal to your URL or profile.',
     rulesAfter3: 'You warrant you have the rights to the mark you submit. Listings may be taken down.',
-    rulesAfter4: 'Polar is the default checkout worldwide. Mercado Pago Checkout Pro is optional in Argentina.',
+    rulesAfter4:
+      'Checkout is Mercado Pago Checkout Pro. The bid is quoted in US dollars and charged in Argentine pesos at the rate frozen when you start payment.',
   },
   es: {
     metaTitle: 'CornerBid — comprá el logo que rebota',
@@ -170,18 +162,8 @@ export const messages = {
     raiseBid: 'Subir oferta',
     bidFineprint:
       'Pagar más compra ocupación, no física más rápida. El tiempo en el slot es cómo tu logo acumula toques. Si te superan, perdés el rebote pero seguís en el ranking — ese cargo no se reintegra. Una visita cuenta cuando alguien abre tu sitio desde el modal de la esquina.',
-    railStepTitle: '¿Cómo querés pagar?',
-    railStepBody:
-      'Polar es el default en todo el mundo. Si estás en Argentina, podés pagar con Mercado Pago Checkout Pro.',
-    railPolar: 'Polar (default)',
-    railPolarHint: 'Tarjeta / wallet. Funciona en todo el mundo.',
-    railMp: 'Mercado Pago',
-    railMpHint: 'Checkout Pro para Argentina. Igual podés elegir Polar.',
-    railContinue: 'Seguir al pago',
-    railBack: 'Volver',
-    railEscape: 'Pagar con Mercado Pago (Argentina)',
     mpCredentialsMissing:
-      'Faltan credenciales de Mercado Pago. Configurá MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET y MP_USD_ARS_RATE.',
+      'Faltan credenciales de Mercado Pago. Configurá MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET, MP_USD_ARS_RATE y NEXT_PUBLIC_APP_URL.',
     hitTheCorner: 'Pegó en la esquina',
     celebrateStats: '{touches} toques · {visits} visitas',
     successKicker: 'Pago recibido',
@@ -235,7 +217,8 @@ export const messages = {
     rulesAfter2:
       'Un toque se registra cuando el screensaver pega en una esquina. Una visita se registra solo cuando alguien entra a tu URL o perfil desde el modal.',
     rulesAfter3: 'Declarás derechos sobre la marca. Las fichas se pueden bajar.',
-    rulesAfter4: 'Polar es el checkout default en todo el mundo. Mercado Pago Checkout Pro es opcional en Argentina.',
+    rulesAfter4:
+      'El checkout es Mercado Pago Checkout Pro. La oferta se cotiza en dólares y se cobra en pesos argentinos al tipo de cambio congelado al iniciar el pago.',
   },
 } as const;
 
@@ -245,8 +228,42 @@ export function interpolate(template: string, vars: Record<string, string | numb
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(vars[key] ?? ''));
 }
 
-export function localeFromAcceptLanguage(header: string | null | undefined): Locale {
-  const first = header?.split(',')[0]?.trim().toLowerCase() ?? '';
-  if (first.startsWith('es')) return 'es';
+function localeFromTag(tag: string): Locale | null {
+  const normalized = tag.split(';')[0]?.trim().toLowerCase().replaceAll('_', '-') ?? '';
+  if (!normalized) return null;
+  if (normalized === 'es' || normalized.startsWith('es-')) return 'es';
   return 'en';
+}
+
+/** First listed language: `es` / `es-*` → Spanish, otherwise English. */
+export function localeFromLanguageList(list: readonly string[]): Locale {
+  for (const entry of list) {
+    const locale = localeFromTag(entry);
+    if (locale) return locale;
+  }
+  return 'en';
+}
+
+export function localeFromNavigator(): Locale {
+  if (typeof navigator === 'undefined') return 'en';
+  const list = [...(navigator.languages ?? []), navigator.language].filter(Boolean);
+  return localeFromLanguageList(list);
+}
+
+export function localeFromAcceptLanguage(header: string | null | undefined): Locale {
+  if (!header?.trim()) return 'en';
+  const ranked = header
+    .split(',')
+    .map((part) => {
+      const [rawTag, ...params] = part.trim().split(';');
+      let q = 1;
+      for (const param of params) {
+        const [key, value] = param.split('=');
+        if (key?.trim() === 'q') q = Number(value);
+      }
+      return { tag: rawTag ?? '', q: Number.isFinite(q) ? q : 0 };
+    })
+    .filter((part) => part.tag.length > 0)
+    .sort((a, b) => b.q - a.q);
+  return localeFromLanguageList(ranked.map((part) => part.tag));
 }

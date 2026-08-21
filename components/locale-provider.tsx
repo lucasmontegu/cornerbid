@@ -1,9 +1,9 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   interpolate,
+  localeFromNavigator,
   LOCALE_COOKIE,
   messages,
   type Locale,
@@ -13,10 +13,13 @@ import {
 interface I18nValue {
   locale: Locale;
   t: (key: MessageKey, vars?: Record<string, string | number>) => string;
-  setLocale: (next: Locale) => void;
 }
 
 const I18nContext = createContext<I18nValue | null>(null);
+
+function expireLocaleCookie() {
+  document.cookie = `${LOCALE_COOKIE}=;path=/;max-age=0;samesite=lax`;
+}
 
 export function LocaleProvider({
   initial,
@@ -25,26 +28,24 @@ export function LocaleProvider({
   initial: Locale;
   children: ReactNode;
 }) {
-  const router = useRouter();
   const [locale, setLocaleState] = useState<Locale>(initial);
 
-  const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next);
-    document.cookie = `${LOCALE_COOKIE}=${next};path=/;max-age=31536000;samesite=lax`;
-    document.documentElement.lang = next;
-    router.refresh();
-  }, [router]);
+  useEffect(() => {
+    expireLocaleCookie();
+    const fromBrowser = localeFromNavigator();
+    setLocaleState(fromBrowser);
+    document.documentElement.lang = fromBrowser;
+  }, []);
 
   const value = useMemo<I18nValue>(
     () => ({
       locale,
-      setLocale,
       t: (key, vars) => {
         const template = messages[locale][key];
         return vars ? interpolate(template, vars) : template;
       },
     }),
-    [locale, setLocale],
+    [locale],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

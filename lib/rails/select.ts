@@ -1,13 +1,8 @@
 /**
- * Argentina is a hint for offering Mercado Pago, never a silent force.
+ * Mercado Pago Checkout Pro is the only live checkout rail.
  *
- * Polar is the default worldwide. Mercado Pago Checkout Pro is offered after a
- * light heuristic (timezone / *-AR language / explicit country) or a manual
- * escape. The UI locale cookie (`cornerbid-locale`) is ignored — English UI
- * must still see the option.
- *
- * Explicit `preferred: 'mercadopago'` always routes to MP, even if the
- * heuristic missed (US timezone on an Argentine laptop).
+ * Polar files remain in the repo unused. Argentina hints are not a checkout
+ * gate. Missing MP env must 503 — never fall through to Polar.
  */
 import type { SettleableRail } from '@/db/schema';
 
@@ -65,7 +60,7 @@ export function isArgentinaHint(input: {
   return false;
 }
 
-/** Client-side heuristic. No IP geolocation. Ignores the UI locale cookie. */
+/** Client-side heuristic. No IP geolocation. Not used as a checkout gate. */
 export function detectArgentinaClient(): boolean {
   try {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -78,11 +73,10 @@ export function detectArgentinaClient(): boolean {
   }
 }
 
-/** Polar unless the bidder explicitly asked for Mercado Pago. */
+/** Always Mercado Pago. Polar is not a live checkout path. */
 export function resolveCheckoutRail(
-  preferred: PreferredRail | undefined,
+  _preferred?: PreferredRail,
   _argentina?: boolean,
 ): SettleableRail {
-  if (preferred === 'mercadopago') return 'mercadopago';
-  return 'polar';
+  return 'mercadopago';
 }

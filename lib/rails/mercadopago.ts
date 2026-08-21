@@ -1,5 +1,5 @@
 /**
- * Mercado Pago Checkout Pro rail (Argentina).
+ * Mercado Pago Checkout Pro rail (default worldwide).
  *
  * Hosted redirect via Preferences — the same shape as Polar. Not Checkout Bricks,
  * not the transparent Checkout API, not card tokenization in this app.
@@ -33,13 +33,14 @@ function requireEnv(name: string): string {
   return value;
 }
 
-/** True when Checkout Pro can create a preference. Missing env must not hide the UI option. */
+/** True when Checkout Pro can create a preference. Missing env returns 503 — never Polar. */
 export function isMercadoPagoConfigured(): boolean {
   const rate = Number(process.env.MP_USD_ARS_RATE);
   return Boolean(
     process.env.MP_ACCESS_TOKEN &&
       process.env.MP_WEBHOOK_SECRET &&
       process.env.MP_USD_ARS_RATE &&
+      process.env.NEXT_PUBLIC_APP_URL &&
       Number.isFinite(rate) &&
       rate > 0,
   );

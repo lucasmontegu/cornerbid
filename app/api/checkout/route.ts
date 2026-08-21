@@ -1,8 +1,8 @@
 /**
- * Creates a bid and hands back a hosted checkout URL.
+ * Creates a bid and hands back a Mercado Pago Checkout Pro URL.
  *
- * Polar is the default worldwide. Mercado Pago Checkout Pro is used when the
- * bidder explicitly chose it (Argentina offer or the manual escape).
+ * Polar is not a live checkout path. Missing MP credentials return 503 — never
+ * a silent Polar fallback.
  */
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -13,9 +13,6 @@ import { parseIdentityInput, resolveIdentity } from '@/lib/identity';
 import { seedFromBidId } from '@/lib/physics';
 import { getQuote, MIN_PLACE_CENTS } from '@/lib/pricing';
 import { isMercadoPagoConfigured, mercadoPagoRail } from '@/lib/rails/mercadopago';
-import { polarRail } from '@/lib/rails/polar';
-import { isArgentinaHint, resolveCheckoutRail, type PreferredRail } from '@/lib/rails/select';
-import type { PaymentRail } from '@/lib/rails/types';
 import { chargeDeltaCents, nextStakeCents } from '@/lib/raise';
 import { getCommittedCents } from '@/lib/stake';
 import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit';
@@ -26,12 +23,7 @@ const CheckoutRequest = z.object({
   expectedAmountCents: z.number().int().min(MIN_PLACE_CENTS).max(99_999_999_00),
   country: z.string().length(2).optional(),
   timeZone: z.string().max(80).optional(),
-  rail: z.enum(['polar', 'mercadopago']).optional(),
 });
-
-function railByName(name: ReturnType<typeof resolveCheckoutRail>): PaymentRail {
-  return name === 'mercadopago' ? mercadoPagoRail : polarRail;
-}
 
 function httpStatusFromUnknown(error: unknown): number | undefined {
   if (!error || typeof error !== 'object') return undefined;
@@ -41,29 +33,16 @@ function httpStatusFromUnknown(error: unknown): number | undefined {
   return undefined;
 }
 
-function checkoutFailureResponse(
-  error: unknown,
-  railName: ReturnType<typeof resolveCheckoutRail>,
-): Response {
+function checkoutFailureResponse(error: unknown): Response {
   const detail = error instanceof Error ? error.message : String(error);
   console.error('[checkout]', detail);
 
-  if (
-    railName === 'mercadopago' &&
-    /MP_ACCESS_TOKEN|MP_WEBHOOK_SECRET|MP_USD_ARS_RATE/.test(detail)
-  ) {
+  if (/MP_ACCESS_TOKEN|MP_WEBHOOK_SECRET|MP_USD_ARS_RATE|NEXT_PUBLIC_APP_URL/.test(detail)) {
     return Response.json(
       {
         error: 'mp_credentials_missing',
         message: 'Faltan credenciales de Mercado Pago',
       },
-      { status: 503 },
-    );
-  }
-
-  if (/POLAR_ACCESS_TOKEN|POLAR_PRODUCT_ID|NEXT_PUBLIC_APP_URL is not set/.test(detail)) {
-    return Response.json(
-      { error: 'payment_misconfigured', message: 'Payment is temporarily unavailable.' },
       { status: 503 },
     );
   }
@@ -95,7 +74,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsedBody.success) {
     return Response.json({ error: 'Invalid request' }, { status: 400 });
   }
-  const { input, email, expectedAmountCents, country, timeZone, rail } = parsedBody.data;
+  const { input, email, expectedAmountCents } = parsedBody.data;
   const receiptEmail = email ?? '';
 
   const parsedIdentity = parseIdentityInput(input);
@@ -110,7 +89,15 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'That listing is not allowed.' }, { status: 422 });
   }
 
-  let railName: ReturnType<typeof resolveCheckoutRail> = 'polar';
+  if (!isMercadoPagoConfigured()) {
+    return Response.json(
+      {
+        error: 'mp_credentials_missing',
+        message: 'Faltan credenciales de Mercado Pago',
+      },
+      { status: 503 },
+    );
+  }
 
   try {
     const quote = await getQuote();
@@ -128,25 +115,6 @@ export async function POST(request: Request): Promise<Response> {
     // Concurrent checkouts are allowed. Occupancy is decided at webhook time:
     // accrue this charge, then take the slot only if the running total is #1.
     const expectedVersion = quote.version;
-
-    const argentina = isArgentinaHint({
-      country,
-      timeZone,
-      acceptLanguage: request.headers.get('accept-language'),
-    });
-    const preferred: PreferredRail | undefined = rail;
-    railName = resolveCheckoutRail(preferred, argentina);
-    const paymentRail = railByName(railName);
-
-    if (railName === 'mercadopago' && !isMercadoPagoConfigured()) {
-      return Response.json(
-        {
-          error: 'mp_credentials_missing',
-          message: 'Faltan credenciales de Mercado Pago',
-        },
-        { status: 503 },
-      );
-    }
 
     const resolved = await resolveIdentity(parsedIdentity);
 
@@ -184,11 +152,11 @@ export async function POST(request: Request): Promise<Response> {
       chargeAmountCents,
       expectedVersion,
       seed: seedFromBidId(bidId),
-      rail: railName,
+      rail: 'mercadopago',
       status: 'created',
     });
 
-    const intent = await paymentRail.createIntent({
+    const intent = await mercadoPagoRail.createIntent({
       bidId,
       quotedAmountCents: quotedTotalCents,
       chargeAmountCents,
@@ -207,7 +175,7 @@ export async function POST(request: Request): Promise<Response> {
       bidId,
       amountCents: quotedTotalCents,
       chargeAmountCents,
-      rail: railName,
+      rail: 'mercadopago',
       redirectUrl: intent.redirectUrl,
       identity: {
         displayName: resolved.displayName,
@@ -216,6 +184,6 @@ export async function POST(request: Request): Promise<Response> {
       },
     });
   } catch (error) {
-    return checkoutFailureResponse(error, railName);
+    return checkoutFailureResponse(error);
   }
 }

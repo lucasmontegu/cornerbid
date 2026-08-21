@@ -3,15 +3,12 @@ import { usdCentsToArs } from './ars';
 import { isArgentinaHint, resolveCheckoutRail } from './select';
 
 describe('rail routing', () => {
-  test('Polar is the default even for Argentina until they opt into MP', () => {
-    expect(resolveCheckoutRail(undefined, true)).toBe('polar');
-    expect(resolveCheckoutRail('polar', true)).toBe('polar');
-    expect(resolveCheckoutRail(undefined, false)).toBe('polar');
-  });
-
-  test('explicit Mercado Pago wins even if the Argentina heuristic missed', () => {
-    expect(resolveCheckoutRail('mercadopago', true)).toBe('mercadopago');
+  test('Mercado Pago is the only live rail, even if Polar is requested', () => {
+    expect(resolveCheckoutRail(undefined, true)).toBe('mercadopago');
+    expect(resolveCheckoutRail(undefined, false)).toBe('mercadopago');
     expect(resolveCheckoutRail('mercadopago', false)).toBe('mercadopago');
+    expect(resolveCheckoutRail('polar', true)).toBe('mercadopago');
+    expect(resolveCheckoutRail('polar', false)).toBe('mercadopago');
   });
 });
 

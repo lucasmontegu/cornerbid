@@ -4,13 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Globe02Icon } from '@hugeicons/core-free-icons'
 import { useI18n } from '@/components/locale-provider'
-import { Button } from '@/components/ui/button'
 import { clampBidCents, dollarsFromCents, formatUsd, parseBidDollars } from '@/lib/money'
 import { MIN_INCREMENT_CENTS, MIN_PLACE_CENTS } from '@/lib/pricing-constants'
 import type { IdentityPreview } from '@/lib/public-state'
 import { chargeDeltaCents, nextStakeCents } from '@/lib/raise'
-import { detectArgentinaClient } from '@/lib/rails/select'
-import type { PreferredRail } from '@/lib/rails/select'
 
 /** Locked height for the URL pill + CTA so the row cannot step. */
 export const BID_ROW_HEIGHT_PX = 48
@@ -20,8 +17,6 @@ interface BidSheetProps {
   onClose?: () => void
   layout?: 'overlay' | 'inline'
 }
-
-type Step = 'compose' | 'rail'
 
 export function BidSheet({
   quoteAmountCents,
@@ -35,15 +30,7 @@ export function BidSheet({
   const [preview, setPreview] = useState<IdentityPreview | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-  const [argentine, setArgentine] = useState(false)
-  const [forceRailChoice, setForceRailChoice] = useState(false)
-  const [step, setStep] = useState<Step>('compose')
-  const [rail, setRail] = useState<PreferredRail>('polar')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    setArgentine(detectArgentinaClient())
-  }, [])
 
   useEffect(() => {
     const floor = Math.max(quoteAmountCents, MIN_PLACE_CENTS)
@@ -113,7 +100,7 @@ export function BidSheet({
     setAmountDraft(dollarsFromCents(next))
   }
 
-  async function checkout(chosenRail: PreferredRail, cents = amountCents) {
+  async function checkout(cents = amountCents) {
     setBusy(true)
     setMessage(null)
     try {
@@ -125,9 +112,7 @@ export function BidSheet({
         body: JSON.stringify({
           input,
           expectedAmountCents: cents,
-          country: argentine || forceRailChoice || chosenRail === 'mercadopago' ? 'AR' : undefined,
           timeZone,
-          rail: chosenRail,
         }),
       })
       const body = (await response.json()) as {
@@ -156,21 +141,8 @@ export function BidSheet({
     }
   }
 
-  const offerRails = argentine || forceRailChoice
-
   function onPayClick() {
-    const cents = snapAmount()
-    if (offerRails && step === 'compose') {
-      setStep('rail')
-      return
-    }
-    void checkout(offerRails ? rail : 'polar', cents)
-  }
-
-  function onMercadoPagoEscape() {
-    setForceRailChoice(true)
-    setRail('mercadopago')
-    setStep('rail')
+    void checkout(snapAmount())
   }
 
   const stepper =
@@ -178,168 +150,116 @@ export function BidSheet({
 
   const form = (
     <div className={layout === 'inline' ? 'w-full' : 'w-full max-w-xl rounded-[28px] bg-paper p-5 shadow-[var(--shadow-border)]'}>
-      {step === 'rail' ? (
-        <div>
-          <p className="font-mono text-[11px] tracking-widest text-hush uppercase">{t('takeTheCorner')}</p>
-          <h2 className="font-display mt-2 text-xl font-semibold text-ink">{t('railStepTitle')}</h2>
-          <p className="mt-2 text-sm text-hush">{t('railStepBody')}</p>
-          <div className="mt-4 grid gap-2">
-            <button
-              type="button"
-              onClick={() => setRail('polar')}
-              className={`rounded-2xl border p-4 text-left transition-[box-shadow,border-color] duration-150 ease-out ${
-                rail === 'polar' ? 'border-ink bg-mist' : 'border-line hover:border-ink/40'
-              }`}
-            >
-              <p className="font-medium">{t('railPolar')}</p>
-              <p className="mt-1 text-xs text-hush">{t('railPolarHint')}</p>
-            </button>
-            <button
-              type="button"
-              onClick={() => setRail('mercadopago')}
-              className={`rounded-2xl border p-4 text-left transition-[box-shadow,border-color] duration-150 ease-out ${
-                rail === 'mercadopago' ? 'border-ink bg-mist' : 'border-line hover:border-ink/40'
-              }`}
-            >
-              <p className="font-medium">{t('railMp')}</p>
-              <p className="mt-1 text-xs text-hush">{t('railMpHint')}</p>
-            </button>
-          </div>
-          <div className="mt-4 flex gap-2">
-            <Button type="button" variant="outline" onClick={() => setStep('compose')}>
-              {t('railBack')}
-            </Button>
-            <Button type="button" className="flex-1" disabled={busy} onClick={() => void checkout(rail, snapAmount())}>
-              {busy ? t('redirecting') : t('railContinue')}
-            </Button>
-          </div>
+      <div className="flex flex-col items-center text-center">
+        {onClose ? (
+          <button type="button" onClick={onClose} className="self-end text-hush hover:text-ink">
+            {t('close')}
+          </button>
+        ) : null}
+
+        <p className="font-display text-balance text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+          {t('fomoHeadline')}
+        </p>
+
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+          <p className="font-display text-2xl font-semibold text-ink sm:text-3xl">{t('claimFor')}</p>
+          <button
+            type="button"
+            aria-label={t('lowerBid')}
+            className={stepper}
+            disabled={amountCents <= floorCents}
+            onClick={() => stepBy(-MIN_INCREMENT_CENTS)}
+          >
+            −
+          </button>
+          <label className="relative">
+            <span className="pointer-events-none absolute top-1/2 left-0 -translate-y-1/2 font-display text-3xl font-semibold text-brand sm:text-4xl">
+              $
+            </span>
+            <input
+              inputMode="numeric"
+              autoComplete="off"
+              spellCheck={false}
+              aria-label={t('amountLabel')}
+              value={amountDraft}
+              onChange={(event) => setAmountDraft(event.target.value)}
+              onBlur={() => snapAmount()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  snapAmount()
+                }
+              }}
+              className="w-[min(42vw,11rem)] bg-transparent py-1 pr-1 pl-7 font-display text-3xl font-semibold text-brand tabular-nums outline-none sm:text-4xl"
+            />
+          </label>
+          <button type="button" aria-label={t('raiseBid')} className={stepper} onClick={() => stepBy(MIN_INCREMENT_CENTS)}>
+            +
+          </button>
         </div>
-      ) : (
-        <>
-          <div className="flex flex-col items-center text-center">
-            {onClose ? (
-              <button type="button" onClick={onClose} className="self-end text-hush hover:text-ink">
-                {t('close')}
-              </button>
-            ) : null}
 
-            <p className="font-display text-balance text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-              {t('fomoHeadline')}
-            </p>
+        <p className="mt-3 max-w-xl text-sm text-brand/80">{t('amountHint')}</p>
+      </div>
 
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-              <p className="font-display text-2xl font-semibold text-ink sm:text-3xl">{t('claimFor')}</p>
-              <button
-                type="button"
-                aria-label={t('lowerBid')}
-                className={stepper}
-                disabled={amountCents <= floorCents}
-                onClick={() => stepBy(-MIN_INCREMENT_CENTS)}
-              >
-                −
-              </button>
-              <label className="relative">
-                <span className="pointer-events-none absolute top-1/2 left-0 -translate-y-1/2 font-display text-3xl font-semibold text-brand sm:text-4xl">
-                  $
-                </span>
-                <input
-                  inputMode="numeric"
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-label={t('amountLabel')}
-                  value={amountDraft}
-                  onChange={(event) => setAmountDraft(event.target.value)}
-                  onBlur={() => snapAmount()}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      snapAmount()
-                    }
-                  }}
-                  className="w-[min(42vw,11rem)] bg-transparent py-1 pr-1 pl-7 font-display text-3xl font-semibold text-brand tabular-nums outline-none sm:text-4xl"
-                />
-              </label>
-              <button type="button" aria-label={t('raiseBid')} className={stepper} onClick={() => stepBy(MIN_INCREMENT_CENTS)}>
-                +
-              </button>
-            </div>
-
-            <p className="mt-3 max-w-xl text-sm text-brand/80">{t('amountHint')}</p>
-          </div>
-
-          <div className="mx-auto mt-6 flex w-full max-w-xl items-stretch gap-2">
-            <label
-              className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-brand/35 bg-paper ps-3 pe-4 shadow-[var(--shadow-border)] transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-brand"
-              style={{ height: BID_ROW_HEIGHT_PX }}
-            >
-              <span className="sr-only">{t('productLabel')}</span>
-              <span className="pointer-events-none flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-mist text-hush">
-                {preview?.imageUrl ? (
-                  // Hotlinked third-party favicon / avatar — never next/image (D4).
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={preview.imageUrl}
-                    alt=""
-                    width={28}
-                    height={28}
-                    className="size-7 object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
-                  />
-                ) : (
-                  <HugeiconsIcon icon={Globe02Icon} size={16} strokeWidth={1.5} />
-                )}
-              </span>
-              <input
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                placeholder={t('productPlaceholder')}
-                className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && input && !busy) onPayClick()
-                }}
+      <div className="mx-auto mt-6 flex w-full max-w-xl items-stretch gap-2">
+        <label
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-brand/35 bg-paper ps-3 pe-4 shadow-[var(--shadow-border)] transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-brand"
+          style={{ height: BID_ROW_HEIGHT_PX }}
+        >
+          <span className="sr-only">{t('productLabel')}</span>
+          <span className="pointer-events-none flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-mist text-hush">
+            {preview?.imageUrl ? (
+              // Hotlinked third-party favicon / avatar — never next/image (D4).
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={preview.imageUrl}
+                alt=""
+                width={28}
+                height={28}
+                className="size-7 object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
               />
-            </label>
-            <button
-              type="button"
-              className="shrink-0 rounded-full bg-brand px-5 text-sm font-semibold whitespace-nowrap text-white transition-[scale,background-color] duration-150 ease-out hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:scale-[0.96] disabled:opacity-50 sm:px-6"
-              style={{ height: BID_ROW_HEIGHT_PX }}
-              disabled={busy || !input || chargeCents <= 0}
-              onClick={onPayClick}
-            >
-              {busy
-                ? t('redirecting')
-                : takesCorner
-                  ? t('takeCornerPay', { price: formatUsd(chargeCents) })
-                  : t('placeOnBoard', { price: formatUsd(chargeCents) })}
-            </button>
-          </div>
+            ) : (
+              <HugeiconsIcon icon={Globe02Icon} size={16} strokeWidth={1.5} />
+            )}
+          </span>
+          <input
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder={t('productPlaceholder')}
+            className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && input && !busy) onPayClick()
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          className="shrink-0 rounded-full bg-brand px-5 text-sm font-semibold whitespace-nowrap text-white transition-[scale,background-color] duration-150 ease-out hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:scale-[0.96] disabled:opacity-50 sm:px-6"
+          style={{ height: BID_ROW_HEIGHT_PX }}
+          disabled={busy || !input || chargeCents <= 0}
+          onClick={onPayClick}
+        >
+          {busy
+            ? t('redirecting')
+            : takesCorner
+              ? t('takeCornerPay', { price: formatUsd(chargeCents) })
+              : t('placeOnBoard', { price: formatUsd(chargeCents) })}
+        </button>
+      </div>
 
-          <p className="mx-auto mt-2 max-w-xl text-center text-[11px] text-hush">{t('raiseHint')}</p>
-          {committed > 0 ? (
-            <p className="mx-auto mt-1 max-w-xl text-center text-[11px] text-brand">
-              {t('alreadyCommitted', {
-                paid: formatUsd(committed),
-                delta: formatUsd(chargeCents),
-              })}
-            </p>
-          ) : null}
+      <p className="mx-auto mt-2 max-w-xl text-center text-[11px] text-hush">{t('raiseHint')}</p>
+      {committed > 0 ? (
+        <p className="mx-auto mt-1 max-w-xl text-center text-[11px] text-brand">
+          {t('alreadyCommitted', {
+            paid: formatUsd(committed),
+            delta: formatUsd(chargeCents),
+          })}
+        </p>
+      ) : null}
 
-          {message ? <p className="mx-auto mt-3 max-w-xl text-xs text-red-600">{message}</p> : null}
+      {message ? <p className="mx-auto mt-3 max-w-xl text-xs text-red-600">{message}</p> : null}
 
-          {offerRails ? null : (
-            <p className="mx-auto mt-3 max-w-xl text-center">
-              <button
-                type="button"
-                className="text-[11px] text-hush underline decoration-line underline-offset-2 hover:text-ink"
-                onClick={onMercadoPagoEscape}
-              >
-                {t('railEscape')}
-              </button>
-            </p>
-          )}
-
-          <p className="mx-auto mt-3 max-w-xl text-center text-[11px] leading-relaxed text-hush">{t('bidFineprint')}</p>
-        </>
-      )}
+      <p className="mx-auto mt-3 max-w-xl text-center text-[11px] leading-relaxed text-hush">{t('bidFineprint')}</p>
     </div>
   )
 
