@@ -33,6 +33,59 @@ function railByName(name: ReturnType<typeof resolveCheckoutRail>): PaymentRail {
   return name === 'mercadopago' ? mercadoPagoRail : polarRail;
 }
 
+function httpStatusFromUnknown(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const candidate = error as { statusCode?: unknown; status?: unknown };
+  if (typeof candidate.statusCode === 'number') return candidate.statusCode;
+  if (typeof candidate.status === 'number') return candidate.status;
+  return undefined;
+}
+
+function checkoutFailureResponse(
+  error: unknown,
+  railName: ReturnType<typeof resolveCheckoutRail>,
+): Response {
+  const detail = error instanceof Error ? error.message : String(error);
+  console.error('[checkout]', detail);
+
+  if (
+    railName === 'mercadopago' &&
+    /MP_ACCESS_TOKEN|MP_WEBHOOK_SECRET|MP_USD_ARS_RATE/.test(detail)
+  ) {
+    return Response.json(
+      {
+        error: 'mp_credentials_missing',
+        message: 'Faltan credenciales de Mercado Pago',
+      },
+      { status: 503 },
+    );
+  }
+
+  if (/POLAR_ACCESS_TOKEN|POLAR_PRODUCT_ID|NEXT_PUBLIC_APP_URL is not set/.test(detail)) {
+    return Response.json(
+      { error: 'payment_misconfigured', message: 'Payment is temporarily unavailable.' },
+      { status: 503 },
+    );
+  }
+
+  if (/paid_total_cents|charge_amount_cents|column .* does not exist|Failed query/i.test(detail)) {
+    return Response.json(
+      { error: 'checkout_unavailable', message: 'Checkout is temporarily unavailable.' },
+      { status: 503 },
+    );
+  }
+
+  const httpStatus = httpStatusFromUnknown(error);
+  if (httpStatus !== undefined && httpStatus >= 400 && httpStatus < 500) {
+    return Response.json(
+      { error: 'payment_rejected', message: 'Could not start payment.' },
+      { status: 422 },
+    );
+  }
+
+  return Response.json({ error: 'Could not start checkout' }, { status: 503 });
+}
+
 export async function POST(request: Request): Promise<Response> {
   if (!rateLimit(`checkout:${clientIp(request)}`, 8, 60_000)) {
     return tooManyRequests();
@@ -57,42 +110,44 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'That listing is not allowed.' }, { status: 422 });
   }
 
-  const quote = await getQuote();
-
-  const alreadyCommittedCents = await getCommittedCents(parsedIdentity.key);
-  const quotedTotalCents = nextStakeCents(alreadyCommittedCents, expectedAmountCents);
-  const chargeAmountCents = chargeDeltaCents(quotedTotalCents, alreadyCommittedCents);
-  if (chargeAmountCents <= 0) {
-    return Response.json(
-      { error: 'raise_required', message: 'Raise the amount above what this listing already paid.' },
-      { status: 409 },
-    );
-  }
-
-  // Concurrent checkouts are allowed. Occupancy is decided at webhook time via
-  // expectedVersion + quoted amount, not a global reservation lock.
-  const expectedVersion = quote.version;
-
-  const argentina = isArgentinaHint({
-    country,
-    timeZone,
-    acceptLanguage: request.headers.get('accept-language'),
-  });
-  const preferred: PreferredRail | undefined = rail;
-  const railName = resolveCheckoutRail(preferred, argentina);
-  const paymentRail = railByName(railName);
-
-  if (railName === 'mercadopago' && !isMercadoPagoConfigured()) {
-    return Response.json(
-      {
-        error: 'mp_credentials_missing',
-        message: 'Faltan credenciales de Mercado Pago',
-      },
-      { status: 503 },
-    );
-  }
+  let railName: ReturnType<typeof resolveCheckoutRail> = 'polar';
 
   try {
+    const quote = await getQuote();
+
+    const alreadyCommittedCents = await getCommittedCents(parsedIdentity.key);
+    const quotedTotalCents = nextStakeCents(alreadyCommittedCents, expectedAmountCents);
+    const chargeAmountCents = chargeDeltaCents(quotedTotalCents, alreadyCommittedCents);
+    if (chargeAmountCents <= 0) {
+      return Response.json(
+        { error: 'raise_required', message: 'Raise the amount above what this listing already paid.' },
+        { status: 409 },
+      );
+    }
+
+    // Concurrent checkouts are allowed. Occupancy is decided at webhook time:
+    // accrue this charge, then take the slot only if the running total is #1.
+    const expectedVersion = quote.version;
+
+    const argentina = isArgentinaHint({
+      country,
+      timeZone,
+      acceptLanguage: request.headers.get('accept-language'),
+    });
+    const preferred: PreferredRail | undefined = rail;
+    railName = resolveCheckoutRail(preferred, argentina);
+    const paymentRail = railByName(railName);
+
+    if (railName === 'mercadopago' && !isMercadoPagoConfigured()) {
+      return Response.json(
+        {
+          error: 'mp_credentials_missing',
+          message: 'Faltan credenciales de Mercado Pago',
+        },
+        { status: 503 },
+      );
+    }
+
     const resolved = await resolveIdentity(parsedIdentity);
 
     const [identity] = await db
@@ -126,6 +181,7 @@ export async function POST(request: Request): Promise<Response> {
       id: bidId,
       identityId,
       quotedAmountCents: quotedTotalCents,
+      chargeAmountCents,
       expectedVersion,
       seed: seedFromBidId(bidId),
       rail: railName,
@@ -160,20 +216,6 @@ export async function POST(request: Request): Promise<Response> {
       },
     });
   } catch (error) {
-    const detail = (error as Error).message;
-    console.error('[checkout]', detail);
-    if (
-      railName === 'mercadopago' &&
-      /MP_ACCESS_TOKEN|MP_WEBHOOK_SECRET|MP_USD_ARS_RATE/.test(detail)
-    ) {
-      return Response.json(
-        {
-          error: 'mp_credentials_missing',
-          message: 'Faltan credenciales de Mercado Pago',
-        },
-        { status: 503 },
-      );
-    }
-    return Response.json({ error: 'Could not start checkout' }, { status: 502 });
+    return checkoutFailureResponse(error, railName);
   }
 }

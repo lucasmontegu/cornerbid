@@ -61,19 +61,20 @@ export async function getTrending(limit = 5): Promise<TrendingEntry[]> {
   });
 }
 
-/** Rank by each identity's running stake (max applied/settled total). #1 is the highest total. */
+/** Rank by cumulative USD paid per identity. #1 is the highest running total. */
 export async function getRanking(limit = 100): Promise<RankingEntry[]> {
   const rows = await db.execute(sql`
     SELECT
       i.id, i.display_name, i.description, i.image_url, i.source_url,
       i.click_count, i.view_count, i.corner_count,
-      max(coalesce(b.paid_amount_cents, b.quoted_amount_cents)) AS amount_cents,
+      i.paid_total_cents AS amount_cents,
       max(coalesce(b.applied_at, b.settled_at, b.created_at)) AS held_at,
       bool_or(b.id = g.current_bid_id) AS is_current
     FROM identities i
     JOIN bids b ON b.identity_id = i.id AND b.status IN ('applied', 'settled')
     CROSS JOIN game_state g
     WHERE i.status <> 'rejected' AND g.id = 1 AND b.rail <> 'house'
+      AND i.paid_total_cents > 0
     GROUP BY i.id
     ORDER BY amount_cents DESC, held_at ASC
     LIMIT ${limit}

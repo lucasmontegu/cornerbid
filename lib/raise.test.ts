@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { chargeDeltaCents, nextStakeCents } from './raise';
+import { chargeDeltaCents, addChargeCents, nextStakeCents } from './raise';
 
 describe('raise by paying the difference', () => {
   test('a new identity pays the full quote', () => {
@@ -30,6 +30,12 @@ describe('nextStakeCents — cumulative total per identity', () => {
     const stake = nextStakeCents(previous, charge);
     expect(stake).toBe(2_000);
     expect(chargeDeltaCents(stake, previous)).toBe(1_000);
+  });
+
+  test('webhook always adds the charge, never replaces the total', () => {
+    expect(addChargeCents(0, 1_000)).toBe(1_000);
+    expect(addChargeCents(1_000, 1_000)).toBe(2_000);
+    expect(addChargeCents(1_000, 400)).toBe(1_400);
   });
 
   test('a charge equal to the occupant amount must still beat the slot', () => {

@@ -113,7 +113,7 @@ export const bids = pgTable(
     paidAmountCents: integer('paid_amount_cents'),
     addons: jsonb('addons').notNull().default({}),
 
-    /** game_state.version at quote time. The takeover only applies if it still matches. */
+    /** game_state.version at quote time. Occupancy uses running total, not this token. */
     expectedVersion: integer('expected_version').notNull(),
 
     /** Drives pickParams(). Derived from the bid id, so the trajectory is reproducible. */

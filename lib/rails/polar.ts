@@ -112,7 +112,10 @@ export const polarRail: PaymentRail = {
       // transport id but the same order, and must not settle twice.
       eventId: `order.paid:${order.id}`,
       bidId,
-      amountCents: quotedAmountCents,
+      amountCents:
+        Number.isFinite(chargeAmountCents) && chargeAmountCents > 0
+          ? chargeAmountCents
+          : quotedAmountCents,
       currency: order.currency ?? 'usd',
       paymentId: order.id,
       raw: event,

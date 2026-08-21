@@ -7,10 +7,9 @@
  *  2. A single statement is atomic by definition and cannot be left half-open by a
  *     serverless invocation that gets frozen or killed mid-flight.
  *
- * The first CTE is a conditional UPDATE guarded by the optimistic-concurrency version.
- * Every later CTE is gated on `EXISTS (SELECT 1 FROM claimed)`, so if the guard fails
- * nothing else runs. Postgres evaluates all of them against the same snapshot, which
- * is what lets `prev` observe the pre-update holder.
+ * Each paid order ADDS its charge onto identities.paid_total_cents. Occupancy then
+ * compares that running total to game_state.current_amount_cents — #1 is whoever has
+ * paid the most, even if two checkouts raced with a stale version token.
  */
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
@@ -19,8 +18,8 @@ import { cornerPeriodSeconds, pickParams, type PhysicsParams } from '@/lib/physi
 export interface TakeoverInput {
   bidId: string;
   identityId: string;
-  /** Running total for this identity, not the increment charged on this order. */
-  paidAmountCents: number;
+  /** USD cents charged on this order — added to the identity's running total. */
+  chargeAmountCents: number;
   expectedVersion: number;
   seed: bigint;
 }
@@ -29,16 +28,18 @@ export interface TakeoverResult {
   won: boolean;
   newVersion: number | null;
   previousIdentityId: string | null;
+  paidTotalCents: number | null;
   params: PhysicsParams;
 }
 
 /**
- * Attempts the takeover. Returns `won: false` without side effects when the slot
- * moved on — the caller then unwinds the payment through the rail.
+ * Accrues the charge, then attempts occupancy if the new total beats the slot.
+ * Returns `won: false` without occupying when someone else already paid more.
  */
 export async function tryTakeover(input: TakeoverInput): Promise<TakeoverResult> {
   const params = pickParams(input.seed);
   const periodSeconds = cornerPeriodSeconds(params);
+  const charge = Math.max(0, input.chargeAmountCents);
 
   const rows = await db.execute(sql`
     WITH prev AS (
@@ -46,11 +47,33 @@ export async function tryTakeover(input: TakeoverInput): Promise<TakeoverResult>
       FROM game_state
       WHERE id = 1
     ),
+    accrued AS (
+      UPDATE identities i SET
+        paid_total_cents = i.paid_total_cents + ${charge}
+      WHERE i.id = ${input.identityId}::uuid
+        AND ${charge} > 0
+        AND EXISTS (
+          SELECT 1 FROM bids b
+          WHERE b.id = ${input.bidId}::uuid
+            AND b.status <> 'applied'
+        )
+      RETURNING i.id, i.paid_total_cents
+    ),
+    recorded AS (
+      UPDATE bids b SET
+        status            = 'applied',
+        applied_at        = coalesce(b.applied_at, now()),
+        paid_amount_cents = (SELECT paid_total_cents FROM accrued),
+        charge_amount_cents = coalesce(b.charge_amount_cents, ${charge})
+      WHERE b.id = ${input.bidId}::uuid
+        AND EXISTS (SELECT 1 FROM accrued)
+      RETURNING b.id
+    ),
     claimed AS (
       UPDATE game_state g SET
         current_identity_id   = ${input.identityId}::uuid,
         current_bid_id        = ${input.bidId}::uuid,
-        current_amount_cents  = ${input.paidAmountCents},
+        current_amount_cents  = (SELECT paid_total_cents FROM accrued),
         version               = g.version + 1,
         physics_started_at    = now(),
         phys_p                = ${params.p},
@@ -60,8 +83,8 @@ export async function tryTakeover(input: TakeoverInput): Promise<TakeoverResult>
         reserved_until        = NULL,
         updated_at            = now()
       WHERE g.id = 1
-        AND g.version = ${input.expectedVersion}
-        AND ${input.paidAmountCents} > g.current_amount_cents
+        AND EXISTS (SELECT 1 FROM accrued)
+        AND (SELECT paid_total_cents FROM accrued) > g.current_amount_cents
       RETURNING g.version
     ),
     demoted AS (
@@ -81,32 +104,28 @@ export async function tryTakeover(input: TakeoverInput): Promise<TakeoverResult>
       WHERE id = ${input.identityId}::uuid
         AND EXISTS (SELECT 1 FROM claimed)
       RETURNING id
-    ),
-    settled AS (
-      UPDATE bids SET
-        status            = 'applied',
-        applied_at        = now(),
-        paid_amount_cents = ${input.paidAmountCents}
-      WHERE id = ${input.bidId}::uuid
-        AND EXISTS (SELECT 1 FROM claimed)
-      RETURNING id
     )
     SELECT
       (SELECT version FROM claimed)              AS new_version,
       (SELECT current_identity_id FROM prev)     AS previous_identity_id,
-      (SELECT count(*) FROM promoted)            AS promoted_count,
-      (SELECT count(*) FROM settled)             AS settled_count
+      (SELECT paid_total_cents FROM accrued)     AS paid_total_cents,
+      (SELECT count(*) FROM recorded)            AS recorded_count,
+      (SELECT count(*) FROM promoted)            AS promoted_count
   `);
 
   const row = (rows.rows[0] ?? {}) as {
     new_version: number | null;
     previous_identity_id: string | null;
+    paid_total_cents: number | string | null;
   };
 
   return {
     won: row.new_version !== null,
     newVersion: row.new_version,
     previousIdentityId: row.previous_identity_id,
+    paidTotalCents: row.paid_total_cents === null || row.paid_total_cents === undefined
+      ? null
+      : Number(row.paid_total_cents),
     params,
   };
 }
@@ -120,26 +139,12 @@ export async function markBidUnwound(bidId: string): Promise<void> {
 
 /**
  * Payment landed but did not take the screensaver. The listing still sits on the
- * board at this amount — that is why the charge is not refunded.
+ * board at the identity's running total — that is why the charge is not refunded.
  */
-export async function placeBidOnBoard(
-  bidId: string,
-  identityId: string,
-  paidAmountCents: number,
-): Promise<void> {
+export async function placeBidOnBoard(identityId: string): Promise<void> {
   await db.execute(sql`
-    WITH placed AS (
-      UPDATE bids SET
-        status = 'applied',
-        applied_at = coalesce(applied_at, now()),
-        paid_amount_cents = ${paidAmountCents}
-      WHERE id = ${bidId}::uuid
-        AND status <> 'applied'
-      RETURNING id
-    )
     UPDATE identities SET status = 'outbid'
     WHERE id = ${identityId}::uuid
       AND status NOT IN ('active', 'rejected')
-      AND EXISTS (SELECT 1 FROM placed)
   `);
 }

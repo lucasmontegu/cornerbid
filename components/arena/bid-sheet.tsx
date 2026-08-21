@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { clampBidCents, dollarsFromCents, formatUsd, parseBidDollars } from '@/lib/money'
 import { MIN_INCREMENT_CENTS, MIN_PLACE_CENTS } from '@/lib/pricing-constants'
 import type { IdentityPreview } from '@/lib/public-state'
+import { chargeDeltaCents, nextStakeCents } from '@/lib/raise'
 import { detectArgentinaClient } from '@/lib/rails/select'
 import type { PreferredRail } from '@/lib/rails/select'
 
@@ -91,8 +92,9 @@ export function BidSheet({
 
   const floorCents = Math.max(quoteAmountCents, MIN_PLACE_CENTS)
   const committed = preview?.alreadyCommittedCents ?? 0
-  const chargeCents = Math.max(0, amountCents - committed)
-  const takesCorner = amountCents >= quoteAmountCents
+  const quotedTotalCents = nextStakeCents(committed, amountCents)
+  const chargeCents = chargeDeltaCents(quotedTotalCents, committed)
+  const takesCorner = quotedTotalCents >= quoteAmountCents
 
   function snapAmount(raw = amountDraft): number {
     const parsed = parseBidDollars(raw)

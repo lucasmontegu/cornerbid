@@ -160,12 +160,18 @@ export const mercadoPagoRail: PaymentRail = {
 
     const quotedRaw = metaString(metadata.quoted_amount_cents) ?? metaString(metadata.quotedAmountCents);
     const quotedAmountCents = quotedRaw ? Number.parseInt(quotedRaw, 10) : 0;
+    const chargeRaw =
+      metaString(metadata.charge_amount_cents) ?? metaString(metadata.chargeAmountCents);
+    const chargeAmountCents = chargeRaw ? Number.parseInt(chargeRaw, 10) : 0;
 
     return {
       rail: 'mercadopago',
       eventId: `payment.approved:${payment.id}`,
       bidId,
-      amountCents: quotedAmountCents,
+      amountCents:
+        Number.isFinite(chargeAmountCents) && chargeAmountCents > 0
+          ? chargeAmountCents
+          : quotedAmountCents,
       currency: payment.currency_id ?? 'ARS',
       paymentId: String(payment.id),
       raw: payment,

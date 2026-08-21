@@ -5,7 +5,7 @@
 import { isBlockedIdentity } from '@/lib/blocklist';
 import { parseIdentityInput, resolveIdentity } from '@/lib/identity';
 import { getQuote } from '@/lib/pricing';
-import { chargeDeltaCents } from '@/lib/raise';
+import { chargeDeltaCents, nextStakeCents } from '@/lib/raise';
 import { getCommittedCents } from '@/lib/stake';
 import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit';
 
@@ -39,7 +39,8 @@ export async function POST(request: Request): Promise<Response> {
       getCommittedCents(parsed.key),
     ]);
 
-    const chargeAmountCents = chargeDeltaCents(quote.amountCents, alreadyCommittedCents);
+    const quotedTotalCents = nextStakeCents(alreadyCommittedCents, quote.amountCents);
+    const chargeAmountCents = chargeDeltaCents(quotedTotalCents, alreadyCommittedCents);
 
     return Response.json(
       {

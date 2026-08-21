@@ -34,10 +34,10 @@ export interface CreateIntentInput {
 /**
  * A settlement, normalized across providers.
  *
- * `amountCents` is the identity's quoted running total (USD cents), never the
- * provider's charged total (tax, ARS conversion, or the raise delta). Takeover
- * still recomputes previous + this_charge so a webhook that only has the delta
- * cannot lose a same-identity raise.
+ * `amountCents` is the USD cents charged on this order (the increment), never the
+ * provider's tax-inclusive total or an ARS conversion. The bid row still stores the
+ * intended running total as `quoted_amount_cents`; settlement adds the charge to
+ * `identities.paid_total_cents`.
  */
 export interface SettlementEvent {
   rail: SettleableRail;

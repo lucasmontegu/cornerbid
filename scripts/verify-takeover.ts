@@ -2,7 +2,7 @@
  * Integration check for lib/takeover.ts against the real database.
  * Creates test rows, exercises the race scenarios, then restores everything.
  */
-import { eq, inArray, like, sql } from 'drizzle-orm';
+import { eq, inArray, like } from 'drizzle-orm';
 import { db } from '@/db';
 import { bids, gameState, identities } from '@/db/schema';
 import { seedFromBidId } from '@/lib/physics';
@@ -28,69 +28,78 @@ await purgeTestRows();
 
 const snapshot = (await db.select().from(gameState).where(eq(gameState.id, 1)))[0]!;
 
-async function makeBidder(key: string, amountCents: number, expectedVersion: number) {
+async function makeBidder(key: string, chargeAmountCents: number, expectedVersion: number) {
   const [identity] = await db.insert(identities).values({
     identityType: 'website', identityKey: key, sourceUrl: `https://${key}`,
     displayName: key, imageUrl: `https://${key}/favicon.ico`,
-    email: `${key}@test.local`, status: 'pending',
+    email: `${key}@test.local`, status: 'pending', paidTotalCents: 0,
   }).returning();
   const bidId = crypto.randomUUID();
   await db.insert(bids).values({
-    id: bidId, identityId: identity!.id, quotedAmountCents: amountCents,
-    expectedVersion, seed: seedFromBidId(bidId), rail: 'polar', status: 'settled',
+    id: bidId, identityId: identity!.id, quotedAmountCents: chargeAmountCents,
+    chargeAmountCents, expectedVersion, seed: seedFromBidId(bidId), rail: 'polar', status: 'settled',
   });
-  return { identityId: identity!.id, bidId, amountCents };
+  return { identityId: identity!.id, bidId, chargeAmountCents };
 }
 
 const v0 = snapshot.version;
 const alice = await makeBidder('test:alice.dev', 10_000, v0);
-const bob = await makeBidder('test:bob.dev', 20_000, v0); // same stale version on purpose
 
 // --- A: first valid takeover wins
-const a = await tryTakeover({ ...alice, paidAmountCents: alice.amountCents, expectedVersion: v0, seed: seedFromBidId(alice.bidId) });
+const a = await tryTakeover({ ...alice, expectedVersion: v0, seed: seedFromBidId(alice.bidId) });
 check('A. valid takeover wins', a.won, true);
 check('A. version incremented', a.newVersion, v0 + 1);
 check('A. previous holder reported', a.previousIdentityId, snapshot.currentIdentityId);
-
-// --- B: second bid quoted against the now-stale version loses
-const b = await tryTakeover({ ...bob, paidAmountCents: bob.amountCents, expectedVersion: v0, seed: seedFromBidId(bob.bidId) });
-check('B. stale-version takeover loses', b.won, false);
-check('B. no version returned', b.newVersion, null);
-
-const afterB = (await db.select().from(gameState).where(eq(gameState.id, 1)))[0]!;
-check('B. slot still held by A', afterB.currentIdentityId, alice.identityId);
-check('B. amount unchanged by loser', afterB.currentAmountCents, alice.amountCents);
-check('B. version not bumped by loser', afterB.version, v0 + 1);
-
-const bobIdentity = (await db.select().from(identities).where(eq(identities.id, bob.identityId)))[0]!;
-check('B. loser identity untouched', bobIdentity.status, 'pending');
-
-// --- statuses after A
-const aliceIdentity = (await db.select().from(identities).where(eq(identities.id, alice.identityId)))[0]!;
-const oldHolder = (await db.select().from(identities).where(eq(identities.id, snapshot.currentIdentityId!)))[0]!;
-check('A. winner is active', aliceIdentity.status, 'active');
-check('A. old holder replaced', oldHolder.status, 'replaced');
-check('A. old holder accrued time held', oldHolder.secondsHeld >= 0, true);
+check('A. running total is the charge', a.paidTotalCents, 10_000);
 
 const aliceBid = (await db.select().from(bids).where(eq(bids.id, alice.bidId)))[0]!;
 check('A. winning bid applied', aliceBid.status, 'applied');
-check('A. paid amount recorded', aliceBid.paidAmountCents, alice.amountCents);
+check('A. paid amount is running total', aliceBid.paidAmountCents, 10_000);
 
-// --- C: current holder defends their own slot (same identity, higher amount)
-const defendBidId = crypto.randomUUID();
+const oldHolder = (await db.select().from(identities).where(eq(identities.id, snapshot.currentIdentityId!)))[0]!;
+check('A. old holder replaced', oldHolder.status, 'replaced');
+
+// --- C: same identity second $100 charge accumulates to $200 and keeps #1
+const aliceRaiseId = crypto.randomUUID();
 await db.insert(bids).values({
-  id: defendBidId, identityId: alice.identityId, quotedAmountCents: 30_000,
-  expectedVersion: v0 + 1, seed: seedFromBidId(defendBidId), rail: 'polar', status: 'settled',
+  id: aliceRaiseId, identityId: alice.identityId, quotedAmountCents: 20_000,
+  chargeAmountCents: 10_000, expectedVersion: v0, seed: seedFromBidId(aliceRaiseId),
+  rail: 'polar', status: 'settled',
 });
-const c = await tryTakeover({ bidId: defendBidId, identityId: alice.identityId, paidAmountCents: 30_000, expectedVersion: v0 + 1, seed: seedFromBidId(defendBidId) });
-check('C. self re-bid wins', c.won, true);
+const c = await tryTakeover({
+  bidId: aliceRaiseId, identityId: alice.identityId, chargeAmountCents: 10_000,
+  expectedVersion: v0, seed: seedFromBidId(aliceRaiseId),
+});
+check('C. two sequential $100 payments become $200', c.won, true);
+check('C. running total $200', c.paidTotalCents, 20_000);
 const aliceAfterC = (await db.select().from(identities).where(eq(identities.id, alice.identityId)))[0]!;
-check('C. self re-bidder stays active (not replaced)', aliceAfterC.status, 'active');
+check('C. paid_total_cents is $200 not last charge', aliceAfterC.paidTotalCents, 20_000);
+check('C. self re-bidder stays active', aliceAfterC.status, 'active');
+const afterC = (await db.select().from(gameState).where(eq(gameState.id, 1)))[0]!;
+check('C. occupant amount is cumulative $200', afterC.currentAmountCents, 20_000);
 
-// --- D: paying less than the current holder never takes over
-const carol = await makeBidder('test:carol.dev', 100, v0 + 2);
-const d = await tryTakeover({ ...carol, paidAmountCents: 100, expectedVersion: v0 + 2, seed: seedFromBidId(carol.bidId) });
-check('D. underbid loses even with correct version', d.won, false);
+// --- B: higher cumulative takes the slot even with a stale version token
+const bob = await makeBidder('test:bob.dev', 25_000, v0);
+const b = await tryTakeover({ ...bob, expectedVersion: v0, seed: seedFromBidId(bob.bidId) });
+check('B. higher cumulative wins despite stale version', b.won, true);
+const afterB = (await db.select().from(gameState).where(eq(gameState.id, 1)))[0]!;
+check('B. slot held by higher total', afterB.currentIdentityId, bob.identityId);
+check('B. occupant amount is Bob cumulative', afterB.currentAmountCents, 25_000);
+const bobIdentity = (await db.select().from(identities).where(eq(identities.id, bob.identityId)))[0]!;
+check('B. Bob paid total is $250', bobIdentity.paidTotalCents, 25_000);
+check('B. winner is active', bobIdentity.status, 'active');
+const aliceAfterB = (await db.select().from(identities).where(eq(identities.id, alice.identityId)))[0]!;
+check('B. Alice paid total kept at $200', aliceAfterB.paidTotalCents, 20_000);
+
+// --- D: paying less than the current holder never takes over (charge still accrues)
+const carol = await makeBidder('test:carol.dev', 100, afterB.version);
+const d = await tryTakeover({ ...carol, expectedVersion: afterB.version, seed: seedFromBidId(carol.bidId) });
+check('D. underbid loses occupancy', d.won, false);
+const carolIdentity = (await db.select().from(identities).where(eq(identities.id, carol.identityId)))[0]!;
+check('D. underbid still accrued on the card', carolIdentity.paidTotalCents, 100);
+const afterD = (await db.select().from(gameState).where(eq(gameState.id, 1)))[0]!;
+check('D. occupant unchanged', afterD.currentIdentityId, bob.identityId);
+check('D. occupant amount unchanged', afterD.currentAmountCents, 25_000);
 
 // --- restore
 await db.update(gameState).set({
@@ -99,9 +108,8 @@ await db.update(gameState).set({
   physicsStartedAt: snapshot.physicsStartedAt, physP: snapshot.physP, physQ: snapshot.physQ,
   nextCornerAt: snapshot.nextCornerAt, reservedAmountCents: null, reservedUntil: null,
 }).where(eq(gameState.id, 1));
-await db.update(identities).set({ status: 'active', secondsHeld: snapshot ? oldHolder.secondsHeld : 0 })
+await db.update(identities).set({ status: 'active', secondsHeld: 0 })
   .where(eq(identities.id, snapshot.currentIdentityId!));
-await db.update(identities).set({ secondsHeld: 0 }).where(eq(identities.id, snapshot.currentIdentityId!));
 const testIds = [alice.identityId, bob.identityId, carol.identityId];
 await db.delete(bids).where(inArray(bids.identityId, testIds));
 await db.delete(identities).where(inArray(identities.id, testIds));

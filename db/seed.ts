@@ -53,6 +53,7 @@ async function seed() {
     id: bidId,
     identityId,
     quotedAmountCents: 0,
+    chargeAmountCents: 0,
     paidAmountCents: 0,
     expectedVersion: 0,
     seed: seedValue,
