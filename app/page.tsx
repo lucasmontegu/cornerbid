@@ -21,7 +21,6 @@ async function loadSnapshot(): Promise<GameSnapshot | null> {
   const rows = await db.execute(sql`
     SELECT g.version, g.current_amount_cents, g.phys_p, g.phys_q,
            g.physics_started_at, g.current_identity_id,
-           (g.reserved_until IS NOT NULL AND g.reserved_until > now()) AS is_reserved,
            i.identity_key, i.display_name, i.image_url, i.source_url, i.description,
            i.click_count, i.corner_count, now() AS server_now
     FROM game_state g JOIN identities i ON i.id = g.current_identity_id WHERE g.id = 1
@@ -52,7 +51,7 @@ async function loadSnapshot(): Promise<GameSnapshot | null> {
     },
     amountCents: Number(row.current_amount_cents ?? 0),
     nextAmountCents: quote.amountCents,
-    reserved: Boolean(row.is_reserved),
+    reserved: false,
   };
 }
 

@@ -1,8 +1,8 @@
 /**
  * Creates a bid and hands back a hosted checkout URL.
  *
- * Polar is the default worldwide. Mercado Pago Checkout Pro is used only when the
- * bidder both looks Argentine (light heuristic) and explicitly chose it.
+ * Polar is the default worldwide. Mercado Pago Checkout Pro is used when the
+ * bidder explicitly chose it (Argentina offer or the manual escape).
  */
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -11,12 +11,12 @@ import { bids, identities } from '@/db/schema';
 import { isBlockedIdentity } from '@/lib/blocklist';
 import { parseIdentityInput, resolveIdentity } from '@/lib/identity';
 import { seedFromBidId } from '@/lib/physics';
-import { getQuote, MIN_PLACE_CENTS, releaseReservation, reserveSlot } from '@/lib/pricing';
-import { mercadoPagoRail } from '@/lib/rails/mercadopago';
+import { getQuote, MIN_PLACE_CENTS } from '@/lib/pricing';
+import { isMercadoPagoConfigured, mercadoPagoRail } from '@/lib/rails/mercadopago';
 import { polarRail } from '@/lib/rails/polar';
 import { isArgentinaHint, resolveCheckoutRail, type PreferredRail } from '@/lib/rails/select';
 import type { PaymentRail } from '@/lib/rails/types';
-import { chargeDeltaCents } from '@/lib/raise';
+import { chargeDeltaCents, nextStakeCents } from '@/lib/raise';
 import { getCommittedCents } from '@/lib/stake';
 import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit';
 
@@ -60,7 +60,8 @@ export async function POST(request: Request): Promise<Response> {
   const quote = await getQuote();
 
   const alreadyCommittedCents = await getCommittedCents(parsedIdentity.key);
-  const chargeAmountCents = chargeDeltaCents(expectedAmountCents, alreadyCommittedCents);
+  const quotedTotalCents = nextStakeCents(alreadyCommittedCents, expectedAmountCents);
+  const chargeAmountCents = chargeDeltaCents(quotedTotalCents, alreadyCommittedCents);
   if (chargeAmountCents <= 0) {
     return Response.json(
       { error: 'raise_required', message: 'Raise the amount above what this listing already paid.' },
@@ -68,18 +69,9 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const takesTheCorner = expectedAmountCents > quote.currentAmountCents;
-  let expectedVersion = quote.version;
-  if (takesTheCorner) {
-    const reservation = await reserveSlot(expectedAmountCents);
-    if (!reservation) {
-      return Response.json(
-        { error: 'reserved', message: 'Someone is bidding right now. Try again in a few minutes.' },
-        { status: 409 },
-      );
-    }
-    expectedVersion = reservation.version;
-  }
+  // Concurrent checkouts are allowed. Occupancy is decided at webhook time via
+  // expectedVersion + quoted amount, not a global reservation lock.
+  const expectedVersion = quote.version;
 
   const argentina = isArgentinaHint({
     country,
@@ -89,6 +81,16 @@ export async function POST(request: Request): Promise<Response> {
   const preferred: PreferredRail | undefined = rail;
   const railName = resolveCheckoutRail(preferred, argentina);
   const paymentRail = railByName(railName);
+
+  if (railName === 'mercadopago' && !isMercadoPagoConfigured()) {
+    return Response.json(
+      {
+        error: 'mp_credentials_missing',
+        message: 'Faltan credenciales de Mercado Pago',
+      },
+      { status: 503 },
+    );
+  }
 
   try {
     const resolved = await resolveIdentity(parsedIdentity);
@@ -123,7 +125,7 @@ export async function POST(request: Request): Promise<Response> {
     await db.insert(bids).values({
       id: bidId,
       identityId,
-      quotedAmountCents: expectedAmountCents,
+      quotedAmountCents: quotedTotalCents,
       expectedVersion,
       seed: seedFromBidId(bidId),
       rail: railName,
@@ -132,7 +134,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const intent = await paymentRail.createIntent({
       bidId,
-      quotedAmountCents: expectedAmountCents,
+      quotedAmountCents: quotedTotalCents,
       chargeAmountCents,
       email: receiptEmail || undefined,
       displayName: resolved.displayName,
@@ -147,7 +149,7 @@ export async function POST(request: Request): Promise<Response> {
 
     return Response.json({
       bidId,
-      amountCents: expectedAmountCents,
+      amountCents: quotedTotalCents,
       chargeAmountCents,
       rail: railName,
       redirectUrl: intent.redirectUrl,
@@ -158,8 +160,20 @@ export async function POST(request: Request): Promise<Response> {
       },
     });
   } catch (error) {
-    if (takesTheCorner) await releaseReservation();
-    console.error('[checkout]', (error as Error).message);
+    const detail = (error as Error).message;
+    console.error('[checkout]', detail);
+    if (
+      railName === 'mercadopago' &&
+      /MP_ACCESS_TOKEN|MP_WEBHOOK_SECRET|MP_USD_ARS_RATE/.test(detail)
+    ) {
+      return Response.json(
+        {
+          error: 'mp_credentials_missing',
+          message: 'Faltan credenciales de Mercado Pago',
+        },
+        { status: 503 },
+      );
+    }
     return Response.json({ error: 'Could not start checkout' }, { status: 502 });
   }
 }

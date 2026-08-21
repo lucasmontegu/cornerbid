@@ -61,7 +61,7 @@ export async function getTrending(limit = 5): Promise<TrendingEntry[]> {
   });
 }
 
-/** Rank by cumulative bid (max applied/settled total), not by who currently holds the plaque. */
+/** Rank by each identity's running stake (max applied/settled total). #1 is the highest total. */
 export async function getRanking(limit = 100): Promise<RankingEntry[]> {
   const rows = await db.execute(sql`
     SELECT

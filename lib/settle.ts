@@ -7,7 +7,9 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { bids, payments } from '@/db/schema';
+import { nextStakeCents } from '@/lib/raise';
 import { RailVerificationError, type PaymentRail, type SettlementEvent } from '@/lib/rails/types';
+import { getCommittedCentsByIdentityId } from '@/lib/stake';
 import { placeBidOnBoard, tryTakeover } from '@/lib/takeover';
 
 export async function settleFromRail(
@@ -61,9 +63,11 @@ export async function settleFromRail(
     .set({ status: 'settled', settledAt: new Date(), railPaymentId: event.paymentId })
     .where(eq(bids.id, bid.id));
 
-  // Prefer the quoted slot total. MP metadata can be stripped; the bid row is
-  // the amount takeover must beat, not the ARS charged on Checkout Pro.
-  const paidAmountCents = event.amountCents > 0 ? event.amountCents : bid.quotedAmountCents;
+  // Incoming may be the new target total *or* this charge. Never pass the charge
+  // alone into tryTakeover — occupant at $10 + another $10 must compare $20 > $10.
+  const incomingCents = event.amountCents > 0 ? event.amountCents : bid.quotedAmountCents;
+  const previousCommittedCents = await getCommittedCentsByIdentityId(bid.identityId, bid.id);
+  const paidAmountCents = nextStakeCents(previousCommittedCents, incomingCents);
 
   const result = await tryTakeover({
     bidId: bid.id,

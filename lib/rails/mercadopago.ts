@@ -33,6 +33,18 @@ function requireEnv(name: string): string {
   return value;
 }
 
+/** True when Checkout Pro can create a preference. Missing env must not hide the UI option. */
+export function isMercadoPagoConfigured(): boolean {
+  const rate = Number(process.env.MP_USD_ARS_RATE);
+  return Boolean(
+    process.env.MP_ACCESS_TOKEN &&
+      process.env.MP_WEBHOOK_SECRET &&
+      process.env.MP_USD_ARS_RATE &&
+      Number.isFinite(rate) &&
+      rate > 0,
+  );
+}
+
 let client: MercadoPagoConfig | undefined;
 function mp(): MercadoPagoConfig {
   client ??= new MercadoPagoConfig({

@@ -80,6 +80,11 @@ export const identities = pgTable(
     clickCount: integer('click_count').notNull().default(0),
     cornerCount: integer('corner_count').notNull().default(0),
     secondsHeld: integer('seconds_held').notNull().default(0),
+    /**
+     * Lifetime USD cents successfully charged for this URL/@handle.
+     * Incremented by each paid webhook — never replaced by the latest checkout.
+     */
+    paidTotalCents: integer('paid_total_cents').notNull().default(0),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -100,8 +105,11 @@ export const bids = pgTable(
       .notNull()
       .references(() => identities.id),
 
-    /** What the bid had to beat when the intent was created. */
+    /** Intended new slot total at checkout (previous total + this charge). */
     quotedAmountCents: integer('quoted_amount_cents').notNull(),
+    /** USD cents charged on this order. Summed into identities.paid_total_cents. */
+    chargeAmountCents: integer('charge_amount_cents'),
+    /** Running total for this identity after this bid settled. */
     paidAmountCents: integer('paid_amount_cents'),
     addons: jsonb('addons').notNull().default({}),
 

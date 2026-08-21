@@ -16,7 +16,6 @@ export const BID_ROW_HEIGHT_PX = 48
 
 interface BidSheetProps {
   quoteAmountCents: number
-  reserved: boolean
   onClose?: () => void
   layout?: 'overlay' | 'inline'
 }
@@ -25,7 +24,6 @@ type Step = 'compose' | 'rail'
 
 export function BidSheet({
   quoteAmountCents,
-  reserved,
   onClose,
   layout = 'overlay',
 }: BidSheetProps) {
@@ -37,6 +35,7 @@ export function BidSheet({
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [argentine, setArgentine] = useState(false)
+  const [forceRailChoice, setForceRailChoice] = useState(false)
   const [step, setStep] = useState<Step>('compose')
   const [rail, setRail] = useState<PreferredRail>('polar')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -124,7 +123,7 @@ export function BidSheet({
         body: JSON.stringify({
           input,
           expectedAmountCents: cents,
-          country: argentine ? 'AR' : undefined,
+          country: argentine || forceRailChoice || chosenRail === 'mercadopago' ? 'AR' : undefined,
           timeZone,
           rail: chosenRail,
         }),
@@ -141,6 +140,10 @@ export function BidSheet({
         setMessage(t('priceMoved', { price: formatUsd(body.amountCents) }))
         return
       }
+      if (body.error === 'mp_credentials_missing') {
+        setMessage(t('mpCredentialsMissing'))
+        return
+      }
       if (!response.ok || !body.redirectUrl) {
         setMessage(body.message ?? body.error ?? t('checkoutFail'))
         return
@@ -151,13 +154,21 @@ export function BidSheet({
     }
   }
 
+  const offerRails = argentine || forceRailChoice
+
   function onPayClick() {
     const cents = snapAmount()
-    if (argentine && step === 'compose') {
+    if (offerRails && step === 'compose') {
       setStep('rail')
       return
     }
-    void checkout(argentine ? rail : 'polar', cents)
+    void checkout(offerRails ? rail : 'polar', cents)
+  }
+
+  function onMercadoPagoEscape() {
+    setForceRailChoice(true)
+    setRail('mercadopago')
+    setStep('rail')
   }
 
   const stepper =
@@ -252,7 +263,6 @@ export function BidSheet({
             </div>
 
             <p className="mt-3 max-w-xl text-sm text-brand/80">{t('amountHint')}</p>
-            {reserved ? <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{t('reserved')}</p> : null}
           </div>
 
           <div className="mx-auto mt-6 flex w-full max-w-xl items-stretch gap-2">
@@ -312,6 +322,18 @@ export function BidSheet({
           ) : null}
 
           {message ? <p className="mx-auto mt-3 max-w-xl text-xs text-red-600">{message}</p> : null}
+
+          {offerRails ? null : (
+            <p className="mx-auto mt-3 max-w-xl text-center">
+              <button
+                type="button"
+                className="text-[11px] text-hush underline decoration-line underline-offset-2 hover:text-ink"
+                onClick={onMercadoPagoEscape}
+              >
+                {t('railEscape')}
+              </button>
+            </p>
+          )}
 
           <p className="mx-auto mt-3 max-w-xl text-center text-[11px] leading-relaxed text-hush">{t('bidFineprint')}</p>
         </>

@@ -23,5 +23,6 @@ export interface GameSnapshot {
   amountCents: number;
   /** What the next bidder must pay. */
   nextAmountCents: number;
+  /** Always false. Checkout no longer holds a global reservation. */
   reserved: boolean;
 }

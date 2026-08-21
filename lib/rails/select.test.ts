@@ -9,9 +9,9 @@ describe('rail routing', () => {
     expect(resolveCheckoutRail(undefined, false)).toBe('polar');
   });
 
-  test('Mercado Pago only when Argentine and they asked for it', () => {
+  test('explicit Mercado Pago wins even if the Argentina heuristic missed', () => {
     expect(resolveCheckoutRail('mercadopago', true)).toBe('mercadopago');
-    expect(resolveCheckoutRail('mercadopago', false)).toBe('polar');
+    expect(resolveCheckoutRail('mercadopago', false)).toBe('mercadopago');
   });
 });
 
@@ -20,8 +20,31 @@ describe('Argentina hint', () => {
     expect(isArgentinaHint({ timeZone: 'America/Argentina/Buenos_Aires' })).toBe(true);
   });
 
+  test('legacy Argentina timezone aliases count', () => {
+    expect(isArgentinaHint({ timeZone: 'America/Buenos_Aires' })).toBe(true);
+    expect(isArgentinaHint({ timeZone: 'America/Cordoba' })).toBe(true);
+    expect(isArgentinaHint({ timeZone: 'America/Mendoza' })).toBe(true);
+    expect(isArgentinaHint({ timeZone: 'America/Argentina/Cordoba' })).toBe(true);
+  });
+
   test('es-AR language tag counts', () => {
     expect(isArgentinaHint({ acceptLanguage: 'es-AR,es;q=0.9' })).toBe(true);
+  });
+
+  test('English UI with AR region still counts', () => {
+    expect(isArgentinaHint({ acceptLanguage: 'en-AR' })).toBe(true);
+    expect(isArgentinaHint({ acceptLanguage: 'en,es-AR;q=0.8' })).toBe(true);
+    expect(
+      isArgentinaHint({
+        timeZone: 'America/Argentina/Buenos_Aires',
+        acceptLanguage: 'en-US',
+      }),
+    ).toBe(true);
+  });
+
+  test('plain English without AR region or timezone does not', () => {
+    expect(isArgentinaHint({ acceptLanguage: 'en' })).toBe(false);
+    expect(isArgentinaHint({ acceptLanguage: 'es' })).toBe(false);
   });
 
   test('US does not', () => {

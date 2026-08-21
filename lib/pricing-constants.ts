@@ -4,5 +4,5 @@ export const MIN_INCREMENT_CENTS = 100;
 /** Lowest whole-dollar listing. There is no product ceiling. */
 export const MIN_PLACE_CENTS = 100;
 
-/** How long a checkout blocks lower quotes. Short enough to limit slot-squatting. */
+/** Legacy column window. Checkout no longer writes or enforces a reservation. */
 export const RESERVATION_MINUTES = 5;

@@ -10,7 +10,7 @@ describe('pricing constants', () => {
     expect(MIN_PLACE_CENTS).toBe(100);
   });
 
-  test('reservation window is 5 minutes', () => {
+  test('legacy reservation window constant remains 5 minutes (unused at checkout)', () => {
     expect(RESERVATION_MINUTES).toBe(5);
   });
 

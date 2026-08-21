@@ -19,6 +19,7 @@ import { cornerPeriodSeconds, pickParams, type PhysicsParams } from '@/lib/physi
 export interface TakeoverInput {
   bidId: string;
   identityId: string;
+  /** Running total for this identity, not the increment charged on this order. */
   paidAmountCents: number;
   expectedVersion: number;
   seed: bigint;

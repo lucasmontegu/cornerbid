@@ -6,6 +6,6 @@ import { useGameLive } from '@/components/game-live'
 export function LiveBidSheet() {
   const { snapshot } = useGameLive()
   return (
-    <BidSheet quoteAmountCents={snapshot.nextAmountCents} reserved={snapshot.reserved} layout="inline" />
+    <BidSheet quoteAmountCents={snapshot.nextAmountCents} layout="inline" />
   )
 }

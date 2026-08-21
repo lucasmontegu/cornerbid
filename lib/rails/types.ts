@@ -1,7 +1,7 @@
 /**
  * One interface, several payment providers.
  *
- * Everything downstream of a settlement — the reservation, the atomic takeover, the
+ * Everything downstream of a settlement — the atomic takeover, the
  * physics reset — is rail-agnostic. Polar and Mercado Pago Checkout Pro both capture
  * on approval; a lost bid is refunded. Authorization holds (`capture: false`) would
  * require Bricks and are out of scope.
@@ -17,7 +17,7 @@ export interface CheckoutIntent {
 
 export interface CreateIntentInput {
   bidId: string;
-  /** New slot total in USD cents — what takeover writes to game_state. */
+  /** New running total in USD cents — what takeover writes to game_state. */
   quotedAmountCents: number;
   /**
    * What to charge now. Returning brands pay the difference from what they have
@@ -34,9 +34,10 @@ export interface CreateIntentInput {
 /**
  * A settlement, normalized across providers.
  *
- * `amountCents` is always the amount *we quoted*, never the provider's charged total,
- * which includes buyer-country tax and would make the leaderboard a ranking of VAT
- * rates rather than of bids.
+ * `amountCents` is the identity's quoted running total (USD cents), never the
+ * provider's charged total (tax, ARS conversion, or the raise delta). Takeover
+ * still recomputes previous + this_charge so a webhook that only has the delta
+ * cannot lose a same-identity raise.
  */
 export interface SettlementEvent {
   rail: SettleableRail;

@@ -26,15 +26,6 @@ export async function GET(): Promise<Response> {
       g.phys_p,
       g.phys_q,
       g.current_identity_id,
-      (g.reserved_until IS NOT NULL AND g.reserved_until > now()) AS is_reserved,
-      GREATEST(
-        g.current_amount_cents,
-        CASE
-          WHEN g.reserved_until IS NOT NULL AND g.reserved_until > now()
-          THEN coalesce(g.reserved_amount_cents, 0)
-          ELSE 0
-        END
-      ) AS quote_floor,
       i.identity_key,
       i.display_name,
       i.description,
@@ -56,8 +47,6 @@ export async function GET(): Promise<Response> {
         phys_p: number;
         phys_q: number;
         current_identity_id: string;
-        is_reserved: boolean;
-        quote_floor: number;
         identity_key: string;
         display_name: string;
         description: string | null;
@@ -98,8 +87,8 @@ export async function GET(): Promise<Response> {
       periodSeconds: cornerPeriodSeconds(params),
     },
     amountCents: Number(row.current_amount_cents),
-    nextAmountCents: Number(row.quote_floor) + MIN_INCREMENT_CENTS,
-    reserved: Boolean(row.is_reserved),
+    nextAmountCents: Number(row.current_amount_cents) + MIN_INCREMENT_CENTS,
+    reserved: false,
   };
 
   return Response.json(payload, { headers: NO_STORE });
