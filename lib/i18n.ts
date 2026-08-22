@@ -5,9 +5,9 @@ export const LOCALE_COOKIE = 'cornerbid-locale';
 
 export const messages = {
   en: {
-    metaTitle: 'CornerBid — buy the bouncing logo',
+    metaTitle: 'CornerBid — most corner hits wins',
     metaDescription:
-      'Pay to put your mark on the screensaver. Time on the slot is how your logo racks up corner hits. A visit counts when someone opens your site from the corner modal.',
+      'Be the logo that hits the corner most. Money only buys the right to play. Rank is permanent hits. A visit counts when someone opens your site from the corner modal.',
     unseeded: 'Database not seeded yet — run',
     brand: 'CornerBid',
     navLeaderboard: 'Leaderboard',
@@ -22,12 +22,12 @@ export const messages = {
     onScreenNow: 'On screen now',
     fomoHeadline: 'Right now, that is someone else’s logo hitting the corner.',
     fomoSub:
-      'Twenty years of waiting for the DVD logo to land in a corner. Pay more than they did and the next one is yours.',
+      'Pay $1 more than the occupant and your mark is the one that scores. Hits stay forever. Rank is not for sale.',
     claimFor: 'Take the corner for',
     tagline:
-      'Paying more buys occupancy — more time, more corner hits. Paying less still lists you. The screensaver only shows the current occupant.',
-    amountHint: 'Whole dollars, no ceiling. Less than the top bid still puts you on the board.',
-    amountHintMore: 'How the price works',
+      'Money buys occupancy. Hits buy rank. Same speed for everyone — paying more does not bounce faster.',
+    amountHint: 'Whole dollars. At least $1 above the occupant takes the slot.',
+    amountHintMore: 'How the game works',
     trending: 'Trending hits',
     noTrending: 'No corner hits in the last hour.',
     activity: 'Latest activity',
@@ -43,11 +43,11 @@ export const messages = {
     productPlaceholder: 'Your product URL or @handle',
     productLabel: 'Product URL or @handle',
     raiseHint:
-      'Already occupying or listed? Enter the same URL or @handle and pay only the difference to stay longer.',
+      'Already listed? Enter the same URL or @handle and pay only the difference to raise.',
     alreadyCommitted: 'Already committed {paid} · pay {delta} more',
     redirecting: 'Redirecting…',
     takeCornerPay: 'Take the corner · {price}',
-    placeOnBoard: 'List on the board · {price}',
+    placeOnBoard: 'Raise your bid · {price}',
     priceMoved: 'The live occupant moved to {price}. Check the new amount and pay again.',
     resolveFail: 'Unable to read that link. Enter a product URL or an X @handle.',
     checkoutFail: 'Unable to start checkout. Check your connection and try again.',
@@ -55,7 +55,7 @@ export const messages = {
     lowerBid: 'Lower bid',
     raiseBid: 'Raise bid',
     bidFineprint:
-      'If someone pays more, you keep your place on the board but lose the corner. That charge is not refunded.',
+      'Payments are not refunded, even if you do not take the slot. Hits you already scored stay on the board.',
     mpCredentialsMissing: 'Payments are unavailable right now. Try again in a few minutes.',
     paypalCredentialsMissing: 'PayPal is unavailable right now. Pay with Mercado Pago instead.',
     railModalTitle: 'How do you want to pay?',
@@ -72,22 +72,28 @@ export const messages = {
     successKicker: 'Payment received',
     successTitle: 'If the webhook landed, your mark is in.',
     successBody:
-      'Fulfillment happens on the payment webhook, not this page. Beat the occupant and your logo bounces — every extra minute is another chance to hit a corner. If you did not take the slot, you still appear on the board. That charge is not refunded.',
+      'Fulfillment happens on the payment webhook, not this page. Beat the occupant and your logo bounces — every corner it hits is yours. Hits already scored stay if someone pays more. That charge is not refunded.',
     successCta: 'Watch it bounce',
     visitorsSinceLaunch: '{n} visitors since launch',
     seeStats: 'see stats',
     topBand: 'TOP {n}',
-    rankingRowMeta: '{time} · {touches} hits · {visits} visits',
-    touchCount: '{n} corner hits',
+    rankingRowMeta: '{time} · bid {bid} · {visits} visits',
+    touchCount: '{n} hits',
+    occupyingNow: 'Occupying now',
+    boardSeason: 'Season {name}',
+    boardAllTime: 'All time',
     peopleOnline: 'People online',
     statsLabel: 'Live board stats',
     statsCorners: 'corners',
     statsClicks: 'clicks',
     statsBid: 'bid',
     statsWindow: 'last 24h',
-    leaderboardEmptyTitle: 'Nobody has paid for the corner yet.',
+    leaderboardEmptyTitle: 'Nobody has scored a hit yet.',
     leaderboardEmptyBody:
-      'The board fills from the top. Whoever goes first sets the price everyone after them has to beat.',
+      'The board ranks by corner hits, not dollars. Take the slot and start scoring.',
+    leaderboardEmptySeasonTitle: 'No hits this season yet.',
+    leaderboardEmptySeasonBody:
+      'Season rank resets every 30 days. All-time hits stay. Take the corner and open the board.',
     leaderboardEmptyCta: 'Be the first',
     footerHouseTagline: 'Sells one bouncing logo. This row is what it has made.',
     footerLaunchedHours: 'launched {n}h ago',
@@ -101,28 +107,43 @@ export const messages = {
     modalDismiss: 'Keep watching',
     aboutTitle: 'About',
     aboutLead:
-      'CornerBid sells one bouncing logo. Your mark is what hits the corners of this window. Time on the slot is the product.',
-    aboutB1Title: 'Buy the bouncing logo',
+      'CornerBid is a public screensaver. The goal is to be the logo that hits the corner most. Money only buys the right to play.',
+    aboutB1Title: 'Pay to occupy. Hits to rank.',
     aboutB1:
-      'Outbid the occupant and your product or @handle takes the screensaver. Physics keeps bouncing. Longer occupancy means more corner hits.',
-    aboutB2Title: 'Raise to stay. Rank is dollars.',
+      'There is one live occupant. Pay at least $1 more than they did and your product or @handle takes the screensaver. Every corner it hits is a permanent point.',
+    aboutB2Title: 'Rank is hits. Money is just the key.',
     aboutB2:
-      'Same URL or @handle pays only the difference. Paying less than the live occupant still lists you. The corner only belongs to whoever holds the slot.',
+      'The board sorts by total corner hits, not by what you paid. Same URL or @handle pays only the difference to raise. Paying more does not bounce faster.',
     aboutB3Title: 'Hits vs visits',
     aboutB3:
       'A hit is the physics event: the logo reached a corner. A visit is counted only when someone opens the occupant’s site from the corner modal.',
     rulesTitle: 'Rules',
     rulesIntro:
-      'CornerBid is a public screensaver with one occupant. You pay so your logo is the one hitting the corners. Rank on the board is the bid. Value on the screen is time — and the corner hits that time produces.',
-    rulesRankTitle: 'The bouncing logo',
-    rulesRank1:
-      'There is one live occupant. Their mark bounces across this window. Every time it hits a corner, that occupant scores a hit, and a modal offers their site to whoever is watching.',
-    rulesRank2:
-      'Taking the corner costs at least $1 more than the current occupant. Paying more buys occupancy, not faster physics. Stay longer and your logo has more chances to hit corners. There is no upper cap. Listings are whole dollars, $1 at a time.',
-    rulesRank3:
-      'Paying less still lists you on the ranking board at whatever place that bid can take. The screensaver still shows the occupant. Equal bids keep the order they were placed — the older listing stays higher.',
+      'Be the logo that hits the corner most. Rank is not for sale. Money only buys the right to play.',
+    rulesRankTitle: 'The board',
+    rulesRank1: 'The board is ordered by lifetime corner hits. Whoever has the most is #1.',
+    rulesRank2: 'Hits add up permanently. They do not reset when you lose the slot.',
+    rulesRank3: 'If two listings have the same hits, the one that reached that count first ranks higher.',
     rulesRank4:
-      'Enter the same website or @handle again to raise. The new total must be at least $1 above what you already paid; you only pay the difference. That is how you keep the slot — and keep hitting corners. Tracking query strings are ignored. App Store, Play Store, GitHub, and similar platform links are keyed by path.',
+      'Each row also shows that listing’s current bid, so you can see what it costs to take the occupant out.',
+    rulesOccupyTitle: 'How to be the bouncing logo',
+    rulesOccupy1: 'Only one logo is on screen at a time.',
+    rulesOccupy2:
+      'To take the slot, pay at least $1 more than the current occupant. Confirmed payment makes you the occupant automatically.',
+    rulesOccupy3: 'While you occupy, every corner hit adds 1 to your total.',
+    rulesOccupy4:
+      'Stay as long as you want. You lose the slot only when someone pays more. Hits you already scored stay.',
+    rulesPayTitle: 'Payments',
+    rulesPay1: 'Bids are whole US dollars, at least $1 above the occupant.',
+    rulesPay2: 'If you are already listed, you only pay the difference to raise your bid.',
+    rulesPay3: 'Every payment is final, even if you do not take the slot.',
+    rulesPay4:
+      'Checkout is Mercado Pago Checkout Pro. The bid is quoted in US dollars and charged in Argentine pesos at the rate of the moment.',
+    rulesPay5: 'You may list the same URL or @handle again to keep adding hits.',
+    rulesHitsTitle: 'Hits and visits',
+    rulesHits1: 'A hit counts only when the logo actually reaches one of the four corners.',
+    rulesHits2:
+      'A corner hit opens a modal with the occupant’s link or @handle. A visit counts only when someone goes through that modal.',
     rulesListTitle: 'What you can list',
     rulesList1: 'A product website, or an X @handle.',
     rulesList2:
@@ -130,19 +151,16 @@ export const messages = {
     rulesList3: 'Links to sexual content are not allowed.',
     rulesList4: 'Query parameters are stripped. Tracking and affiliate URLs will not keep those parameters.',
     rulesList5: 'Link shorteners are not allowed.',
-    rulesAfterTitle: 'After you pay',
-    rulesAfter1:
-      'A completed payment lists you. If you took the slot, your logo bounces until someone pays more. If you did not, you stay on the board — that charge is not refunded.',
-    rulesAfter2:
-      'A hit is recorded when the screensaver hits a corner. A visit is recorded only when someone goes through the corner modal to your URL or profile.',
+    rulesAfterTitle: 'Other conditions',
+    rulesAfter1: 'Physics is the same for everyone. Paying more does not bounce faster.',
+    rulesAfter2: 'A 30-day season board runs beside all-time. Season hits reset; lifetime hits do not.',
     rulesAfter3: 'You warrant you have the rights to the mark you submit. Listings may be taken down.',
-    rulesAfter4:
-      'Checkout is Mercado Pago Checkout Pro. The bid is quoted in US dollars and charged in Argentine pesos at the rate frozen when you start payment.',
+    rulesAfter4: 'The board updates in real time.',
   },
   es: {
-    metaTitle: 'CornerBid — comprá el logo que rebota',
+    metaTitle: 'CornerBid — gana quien más pega en la esquina',
     metaDescription:
-      'Pagás para poner tu marca en el screensaver. El tiempo en el slot es cómo tu logo acumula toques de esquina. Una visita cuenta cuando alguien abre tu sitio desde el modal.',
+      'Sé el logo que más veces pega en la esquina. La plata solo compra el derecho a jugar. El ranking son hits permanentes. Una visita cuenta cuando alguien abre tu sitio desde el modal.',
     unseeded: 'La base todavía no tiene seed — corré',
     brand: 'CornerBid',
     navLeaderboard: 'Ranking',
@@ -157,12 +175,12 @@ export const messages = {
     onScreenNow: 'Ahora en pantalla',
     fomoHeadline: 'Ahora mismo el logo que pega en la esquina es de otro.',
     fomoSub:
-      'Veinte años esperando que el logo del DVD caiga justo en una esquina. Pagá más que él y la próxima es tuya.',
+      'Pagá $1 más que el ocupante y tu marca es la que suma. Los hits quedan para siempre. El ranking no se compra.',
     claimFor: 'Tomá la esquina por',
     tagline:
-      'Pagar más compra la ocupación: más tiempo, más toques de esquina. Pagar menos igual te lista. El screensaver solo muestra al ocupante.',
-    amountHint: 'Dólares enteros, sin techo. Menos que la oferta más alta igual te mete en el ranking.',
-    amountHintMore: 'Cómo funciona el precio',
+      'La plata compra la ocupación. Los hits compran el ranking. Misma velocidad para todos: pagar más no rebota más rápido.',
+    amountHint: 'Dólares enteros. Al menos $1 más que el ocupante te lleva el slot.',
+    amountHintMore: 'Cómo funciona el juego',
     trending: 'Toques en tendencia',
     noTrending: 'No hay toques de esquina en la última hora.',
     activity: 'Actividad reciente',
@@ -178,11 +196,11 @@ export const messages = {
     productPlaceholder: 'URL del producto o @handle',
     productLabel: 'URL del producto o @handle',
     raiseHint:
-      '¿Ya ocupás o estás listado? Poné la misma URL o @handle y pagás solo la diferencia para quedarte más tiempo.',
+      '¿Ya estás listado? Poné la misma URL o @handle y pagás solo la diferencia para subir.',
     alreadyCommitted: 'Ya comprometiste {paid} · pagás {delta} más',
     redirecting: 'Redirigiendo…',
     takeCornerPay: 'Tomá la esquina · {price}',
-    placeOnBoard: 'Listate en el ranking · {price}',
+    placeOnBoard: 'Subí tu puja · {price}',
     priceMoved: 'El ocupante en vivo pasó a {price}. Revisá el nuevo monto y pagá de nuevo.',
     resolveFail: 'No pudimos leer ese link. Poné la URL de un producto o un @usuario de X.',
     checkoutFail: 'No se pudo abrir el pago. Revisá tu conexión y probá de nuevo.',
@@ -190,7 +208,7 @@ export const messages = {
     lowerBid: 'Bajar oferta',
     raiseBid: 'Subir oferta',
     bidFineprint:
-      'Si alguien paga más, conservás tu lugar en el ranking pero perdés la esquina. Ese cargo no se reintegra.',
+      'Los pagos no se reintegran, aunque no tomes el slot. Los hits que ya sumaste se quedan en el ranking.',
     mpCredentialsMissing: 'Los pagos no están disponibles por ahora. Probá de nuevo en unos minutos.',
     paypalCredentialsMissing: 'PayPal no está disponible ahora. Pagá con Mercado Pago.',
     railModalTitle: '¿Cómo querés pagar?',
@@ -207,22 +225,28 @@ export const messages = {
     successKicker: 'Pago recibido',
     successTitle: 'Si el webhook llegó, tu marca ya está.',
     successBody:
-      'La confirmación la hace el webhook, no esta página. Si le ganás al ocupante, tu logo rebota: cada minuto extra es otra chance de pegar en una esquina. Si no tomaste el slot, igual aparecés en el ranking. Ese cargo no se reintegra.',
+      'La confirmación la hace el webhook, no esta página. Si le ganás al ocupante, tu logo rebota: cada esquina que pega es tuya. Si alguien paga más, los hits ya sumados se quedan. Ese cargo no se reintegra.',
     successCta: 'Ver el rebote',
     visitorsSinceLaunch: '{n} visitantes desde el lanzamiento',
     seeStats: 'ver stats',
     topBand: 'TOP {n}',
-    rankingRowMeta: '{time} · {touches} toques · {visits} visitas',
-    touchCount: '{n} toques de esquina',
+    rankingRowMeta: '{time} · puja {bid} · {visits} visitas',
+    touchCount: '{n} hits',
+    occupyingNow: 'Ocupando ahora',
+    boardSeason: 'Temporada {name}',
+    boardAllTime: 'Histórico',
     peopleOnline: 'Personas en línea',
     statsLabel: 'Datos en vivo del tablero',
     statsCorners: 'esquinas',
     statsClicks: 'clics',
     statsBid: 'apostados',
     statsWindow: 'últimas 24 h',
-    leaderboardEmptyTitle: 'Todavía nadie pagó por la esquina.',
+    leaderboardEmptyTitle: 'Todavía nadie sumó un hit.',
     leaderboardEmptyBody:
-      'El tablero se llena desde arriba. El que va primero le pone el precio a todos los que vengan después.',
+      'El ranking es por toques de esquina, no por plata. Tomá el slot y empezá a sumar.',
+    leaderboardEmptySeasonTitle: 'Todavía no hay hits en esta temporada.',
+    leaderboardEmptySeasonBody:
+      'El ranking de temporada se reinicia cada 30 días. El histórico no. Tomá la esquina y abrí el tablero.',
     leaderboardEmptyCta: 'Sé el primero',
     footerHouseTagline: 'Vende un logo que rebota. Esta fila es lo que lleva ganado.',
     footerLaunchedHours: 'lanzado hace {n} h',
@@ -236,28 +260,43 @@ export const messages = {
     modalDismiss: 'Seguir mirando',
     aboutTitle: 'Acerca',
     aboutLead:
-      'CornerBid vende un logo que rebota. Tu marca es la que pega en las esquinas de esta ventana. El tiempo en el slot es el producto.',
-    aboutB1Title: 'Comprá el logo que rebota',
+      'CornerBid es un screensaver público. El objetivo es ser el logo que más veces pega en la esquina. La plata solo compra el derecho a jugar.',
+    aboutB1Title: 'Pagás para ocupar. Los hits dan el ranking.',
     aboutB1:
-      'Superá al ocupante y tu producto o @handle toma el screensaver. La física sigue rebotando. Más tiempo ocupado, más toques de esquina.',
-    aboutB2Title: 'Subí para quedarte. El ranking son dólares.',
+      'Hay un solo ocupante. Pagá al menos $1 más que él y tu producto o @handle toma el screensaver. Cada esquina que pega es un punto permanente.',
+    aboutB2Title: 'El ranking son hits. La plata es la llave.',
     aboutB2:
-      'La misma URL o @handle paga solo la diferencia. Pagar menos que el ocupante igual te lista. El rebote es de quien tiene el slot.',
-    aboutB3Title: 'Toques vs visitas',
+      'El tablero se ordena por toques de esquina, no por lo pagado. La misma URL o @handle paga solo la diferencia para subir. Pagar más no rebota más rápido.',
+    aboutB3Title: 'Hits vs visitas',
     aboutB3:
-      'Un toque es el evento de física: el logo llegó a una esquina. Una visita se cuenta solo cuando alguien abre el sitio del ocupante desde el modal.',
+      'Un hit es el evento de física: el logo llegó a una esquina. Una visita se cuenta solo cuando alguien abre el sitio del ocupante desde el modal.',
     rulesTitle: 'Reglas',
     rulesIntro:
-      'CornerBid es un screensaver público con un ocupante. Pagás para que tu logo sea el que pega en las esquinas. El ranking es la oferta. El valor en pantalla es el tiempo — y los toques que ese tiempo produce.',
-    rulesRankTitle: 'El logo que rebota',
-    rulesRank1:
-      'Hay un ocupante en vivo. Su marca rebota por esta ventana. Cada vez que pega en una esquina, ese ocupante suma un toque, y un modal ofrece su sitio a quien está mirando.',
-    rulesRank2:
-      'Tomar el rebote cuesta al menos $1 más que el ocupante. Pagar más compra ocupación, no física más rápida. Quedate más tiempo y tu logo tiene más chances de pegar. No hay techo. Dólares enteros, de a $1.',
-    rulesRank3:
-      'Pagar menos igual te lista en el ranking en el puesto que esa oferta pueda tomar. El screensaver sigue mostrando al ocupante. Ofertas iguales conservan el orden: la más vieja queda más arriba.',
+      'Sé el logo que más veces pega en la esquina. El ranking no se compra. La plata solo te compra el derecho a jugar.',
+    rulesRankTitle: 'El ranking principal',
+    rulesRank1: 'El ranking se ordena por hits de esquina acumulados. Quien más tenga es el #1.',
+    rulesRank2: 'Los hits se suman para siempre. No se resetean cuando perdés el slot.',
+    rulesRank3: 'Si dos fichas tienen la misma cantidad, gana la que llegó primero a ese número.',
     rulesRank4:
-      'Volvé a ingresar el mismo sitio o @handle para subir. El total nuevo tiene que ser al menos $1 más que lo ya pagado; solo pagás la diferencia. Así te quedás el slot — y seguís pegando esquinas. Se ignoran query strings de tracking. App Store, Play Store, GitHub y similares se clavean por path.',
+      'Cada fila también muestra la puja actual, para ver cuánto hay que pagar para sacar al ocupante.',
+    rulesOccupyTitle: 'Cómo ser el logo que rebota',
+    rulesOccupy1: 'Solo hay un logo activo a la vez.',
+    rulesOccupy2:
+      'Para tomar el slot hay que pagar al menos $1 más que el ocupante. El pago confirmado te convierte en ocupante al toque.',
+    rulesOccupy3: 'Mientras ocupás, cada esquina que pega suma 1 a tu total.',
+    rulesOccupy4:
+      'Podés quedarte todo el tiempo que quieras. Solo te sacan cuando alguien paga más. Los hits ya sumados se quedan.',
+    rulesPayTitle: 'Pagos',
+    rulesPay1: 'Las pujas son en dólares enteros, al menos $1 más que el ocupante.',
+    rulesPay2: 'Si ya estás listado, solo pagás la diferencia para subir tu puja.',
+    rulesPay3: 'Todo pago es final, aunque no llegues a ser el logo principal.',
+    rulesPay4:
+      'El checkout es Mercado Pago Checkout Pro. La oferta se cotiza en dólares y se cobra en pesos argentinos al tipo de cambio del momento.',
+    rulesPay5: 'Podés volver a listar la misma URL o @handle para seguir sumando hits.',
+    rulesHitsTitle: 'Hits y visitas',
+    rulesHits1: 'Un hit cuenta solo cuando el logo pega de verdad en una de las cuatro esquinas.',
+    rulesHits2:
+      'Al pegar se abre un modal con el link o @handle del ocupante. Una visita cuenta solo cuando alguien entra por ese modal.',
     rulesListTitle: 'Qué podés listar',
     rulesList1: 'Un sitio de producto, o un @handle de X.',
     rulesList2:
@@ -265,14 +304,11 @@ export const messages = {
     rulesList3: 'No se permite contenido sexual.',
     rulesList4: 'Se recortan los query params. URLs de tracking o afiliados no los conservan.',
     rulesList5: 'No se permiten acortadores de links.',
-    rulesAfterTitle: 'Después de pagar',
-    rulesAfter1:
-      'Un pago completo te lista. Si tomaste el slot, tu logo rebota hasta que alguien pague más. Si no, seguís en el ranking — ese cargo no se reintegra.',
-    rulesAfter2:
-      'Un toque se registra cuando el screensaver pega en una esquina. Una visita se registra solo cuando alguien entra a tu URL o perfil desde el modal.',
+    rulesAfterTitle: 'Otras condiciones',
+    rulesAfter1: 'La física es la misma para todos. Pagar más no rebota más rápido.',
+    rulesAfter2: 'Hay un ranking de temporada de 30 días al lado del histórico. La temporada se reinicia; el histórico no.',
     rulesAfter3: 'Declarás derechos sobre la marca. Las fichas se pueden bajar.',
-    rulesAfter4:
-      'El checkout es Mercado Pago Checkout Pro. La oferta se cotiza en dólares y se cobra en pesos argentinos al tipo de cambio congelado al iniciar el pago.',
+    rulesAfter4: 'El ranking se actualiza en tiempo real.',
   },
 } as const;
 

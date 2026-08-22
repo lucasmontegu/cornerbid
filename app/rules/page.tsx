@@ -22,6 +22,29 @@ export default async function RulesPage() {
           <li>{copy.rulesRank4}</li>
         </ul>
 
+        <h2 className="font-display mt-8 mb-3 text-xl font-semibold">{copy.rulesOccupyTitle}</h2>
+        <ul className="list-disc space-y-2 ps-5">
+          <li>{copy.rulesOccupy1}</li>
+          <li>{copy.rulesOccupy2}</li>
+          <li>{copy.rulesOccupy3}</li>
+          <li>{copy.rulesOccupy4}</li>
+        </ul>
+
+        <h2 className="font-display mt-8 mb-3 text-xl font-semibold">{copy.rulesPayTitle}</h2>
+        <ul className="list-disc space-y-2 ps-5">
+          <li>{copy.rulesPay1}</li>
+          <li>{copy.rulesPay2}</li>
+          <li>{copy.rulesPay3}</li>
+          <li>{copy.rulesPay4}</li>
+          <li>{copy.rulesPay5}</li>
+        </ul>
+
+        <h2 className="font-display mt-8 mb-3 text-xl font-semibold">{copy.rulesHitsTitle}</h2>
+        <ul className="list-disc space-y-2 ps-5">
+          <li>{copy.rulesHits1}</li>
+          <li>{copy.rulesHits2}</li>
+        </ul>
+
         <h2 className="font-display mt-8 mb-3 text-xl font-semibold">{copy.rulesListTitle}</h2>
         <ul className="list-disc space-y-2 ps-5">
           <li>{copy.rulesList1}</li>

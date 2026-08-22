@@ -1,11 +1,17 @@
 /**
  * The numbers the front page renders: trending rate, ranking and live activity.
  *
+ * Rank is lifetime (or season) corner hits — money only buys occupancy.
  * These are read on every page load, so they are plain SQL against indexed columns
  * rather than anything that needs a separate analytics service.
  */
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
+import { seasonAt, type Season } from '@/lib/season';
+
+export { sortRanking } from '@/lib/ranking-order';
+
+export type RankingScope = 'all-time' | 'season';
 
 export interface TrendingEntry {
   identityId: string;
@@ -25,6 +31,7 @@ export interface RankingEntry {
   viewCount: number;
   cornerCount: number;
   isCurrentHolder: boolean;
+  /** When this listing reached its current hit count. Tie-break: earlier wins. */
   heldAt: Date;
 }
 
@@ -33,6 +40,22 @@ export interface ActivityEntry {
   imageUrl: string;
   amountCents: number;
   at: Date;
+}
+
+function mapRankingRow(r: Record<string, unknown>): RankingEntry {
+  return {
+    identityId: r.id as string,
+    displayName: r.display_name as string,
+    description: r.description as string | null,
+    imageUrl: r.image_url as string,
+    sourceUrl: r.source_url as string,
+    amountCents: Number(r.amount_cents ?? 0),
+    clickCount: Number(r.click_count ?? 0),
+    viewCount: Number(r.view_count ?? 0),
+    cornerCount: Number(r.corner_count ?? 0),
+    isCurrentHolder: Boolean(r.is_current),
+    heldAt: new Date(r.held_at as string),
+  };
 }
 
 /**
@@ -61,14 +84,28 @@ export async function getTrending(limit = 5): Promise<TrendingEntry[]> {
   });
 }
 
-/** Rank by cumulative USD paid per identity. #1 is the highest running total. */
-export async function getRanking(limit = 100): Promise<RankingEntry[]> {
+/** Rank by accumulated corner hits. #1 is whoever has the most, then who got there first. */
+export async function getRanking(
+  limit = 100,
+  options?: { scope?: RankingScope; now?: Date },
+): Promise<RankingEntry[]> {
+  const scope = options?.scope ?? 'all-time';
+  if (scope === 'season') {
+    return getSeasonRanking(limit, seasonAt(options?.now));
+  }
+  return getAllTimeRanking(limit);
+}
+
+async function getAllTimeRanking(limit: number): Promise<RankingEntry[]> {
   const rows = await db.execute(sql`
     SELECT
       i.id, i.display_name, i.description, i.image_url, i.source_url,
       i.click_count, i.view_count, i.corner_count,
       i.paid_total_cents AS amount_cents,
-      max(coalesce(b.applied_at, b.settled_at, b.created_at)) AS held_at,
+      coalesce(
+        (SELECT max(h.hit_at) FROM corner_hits h WHERE h.identity_id = i.id),
+        max(coalesce(b.applied_at, b.settled_at, b.created_at))
+      ) AS held_at,
       bool_or(b.id = g.current_bid_id) AS is_current
     FROM identities i
     JOIN bids b ON b.identity_id = i.id AND b.status IN ('applied', 'settled')
@@ -76,26 +113,40 @@ export async function getRanking(limit = 100): Promise<RankingEntry[]> {
     WHERE i.status <> 'rejected' AND g.id = 1 AND b.rail <> 'house'
       AND i.paid_total_cents > 0
     GROUP BY i.id
-    ORDER BY amount_cents DESC, held_at ASC
+    ORDER BY i.corner_count DESC, held_at ASC
     LIMIT ${limit}
   `);
 
-  return rows.rows.map((r) => {
-    const row = r as Record<string, unknown>;
-    return {
-      identityId: row.id as string,
-      displayName: row.display_name as string,
-      description: row.description as string | null,
-      imageUrl: row.image_url as string,
-      sourceUrl: row.source_url as string,
-      amountCents: Number(row.amount_cents ?? 0),
-      clickCount: Number(row.click_count ?? 0),
-      viewCount: Number(row.view_count ?? 0),
-      cornerCount: Number(row.corner_count ?? 0),
-      isCurrentHolder: Boolean(row.is_current),
-      heldAt: new Date(row.held_at as string),
-    };
-  });
+  return rows.rows.map((r) => mapRankingRow(r as Record<string, unknown>));
+}
+
+async function getSeasonRanking(limit: number, season: Season): Promise<RankingEntry[]> {
+  const rows = await db.execute(sql`
+    SELECT
+      i.id, i.display_name, i.description, i.image_url, i.source_url,
+      i.click_count, i.view_count,
+      coalesce(s.hits, 0)::int AS corner_count,
+      i.paid_total_cents AS amount_cents,
+      coalesce(s.reached_at, max(coalesce(b.applied_at, b.settled_at, b.created_at))) AS held_at,
+      bool_or(b.id = g.current_bid_id) AS is_current
+    FROM identities i
+    JOIN bids b ON b.identity_id = i.id AND b.status IN ('applied', 'settled')
+    CROSS JOIN game_state g
+    LEFT JOIN (
+      SELECT identity_id, count(*)::int AS hits, max(hit_at) AS reached_at
+      FROM corner_hits
+      WHERE hit_at >= ${season.start.toISOString()}::timestamptz
+        AND hit_at < ${season.end.toISOString()}::timestamptz
+      GROUP BY identity_id
+    ) s ON s.identity_id = i.id
+    WHERE i.status <> 'rejected' AND g.id = 1 AND b.rail <> 'house'
+      AND (s.hits > 0 OR b.id = g.current_bid_id)
+    GROUP BY i.id, s.hits, s.reached_at
+    ORDER BY coalesce(s.hits, 0) DESC, held_at ASC
+    LIMIT ${limit}
+  `);
+
+  return rows.rows.map((r) => mapRankingRow(r as Record<string, unknown>));
 }
 
 /** Recent takeovers, for the live ticker. */

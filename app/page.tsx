@@ -6,6 +6,7 @@ import { SiteHeader } from '@/components/site-header';
 import { ViewBeacon } from '@/components/view-beacon';
 import { LiveStatsBar } from '@/components/live-stats-bar';
 import { getRanking, getRecentActivity, getTrending } from '@/lib/leaderboard';
+import { formatSeasonName, seasonAt } from '@/lib/season';
 import { getDataFastVisitorsSinceLaunch } from '@/lib/datafast';
 import { getLiveStats } from '@/lib/live-stats';
 import { interpolate, messages } from '@/lib/i18n';
@@ -65,11 +66,13 @@ export default async function Home() {
     return vars ? interpolate(template, vars) : template;
   };
 
-  const [snapshot, trending, ranking, activity, visitors, house, liveStats] =
+  const season = seasonAt();
+  const [snapshot, trending, ranking, seasonRanking, activity, visitors, house, liveStats] =
     await Promise.all([
       loadSnapshot(),
       getTrending(),
       getRanking(100),
+      getRanking(100, { scope: 'season', now: season.start }),
       getRecentActivity(),
       getDataFastVisitorsSinceLaunch(),
       getHouseRow(),
@@ -162,7 +165,12 @@ export default async function Home() {
         </div>
 
         <div className="mt-10">
-          <LiveLeaderboard ranking={ranking} locale={locale} />
+          <LiveLeaderboard
+            allTime={ranking}
+            season={seasonRanking}
+            seasonLabel={formatSeasonName(season, locale)}
+            locale={locale}
+          />
         </div>
       </section>
       </main>

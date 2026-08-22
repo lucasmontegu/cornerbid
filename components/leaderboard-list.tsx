@@ -59,21 +59,19 @@ function RankRow({
           <div className="flex items-baseline justify-between gap-3">
             <span className="truncate font-semibold">{entry.displayName}</span>
             <span className={`shrink-0 font-semibold tabular-nums ${featured ? 'text-brand-deep' : 'text-ink'}`}>
-              {formatUsd(entry.amountCents)}
+              {interpolate(copy.touchCount, { n: entry.cornerCount })}
             </span>
           </div>
           {entry.description ? (
             <p className="mt-1 line-clamp-2 text-sm text-hush">{entry.description}</p>
           ) : null}
           {entry.isCurrentHolder ? (
-            <p className="mt-1 text-sm font-semibold tabular-nums">
-              {interpolate(copy.touchCount, { n: entry.cornerCount })}
-            </p>
+            <p className="mt-1 text-sm font-semibold">{copy.occupyingNow}</p>
           ) : null}
           <p className="mt-1 text-xs text-hush">
             {interpolate(copy.rankingRowMeta, {
               time: ago(locale, entry.heldAt),
-              touches: entry.cornerCount,
+              bid: formatUsd(entry.amountCents),
               visits: entry.clickCount,
             })}
           </p>
@@ -98,23 +96,24 @@ function BandRule({ n, locale }: { n: number; locale: Locale }) {
 export function LeaderboardList({
   ranking,
   locale,
+  emptyTitle,
+  emptyBody,
 }: {
   ranking: RankingEntry[]
   locale: Locale
+  emptyTitle?: string
+  emptyBody?: string
 }) {
   const copy = messages[locale]
 
-  // Returning null left a `mt-10` wrapper holding an unexplained gap between
-  // the activity cards and the footer. An empty board is a state, not an
-  // absence — and on a brand-new board it is the most persuasive one.
   if (ranking.length === 0) {
     return (
       <div id="leaderboard" className="rounded-[28px] border-2 border-dashed border-line px-6 py-10 text-center">
         <h2 className="font-display text-lg font-semibold text-balance text-ink">
-          {copy.leaderboardEmptyTitle}
+          {emptyTitle ?? copy.leaderboardEmptyTitle}
         </h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-pretty text-hush">
-          {copy.leaderboardEmptyBody}
+          {emptyBody ?? copy.leaderboardEmptyBody}
         </p>
         <a
           href="#bid"

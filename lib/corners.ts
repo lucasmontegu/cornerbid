@@ -1,8 +1,9 @@
 /**
  * Lazy corner-hit persistence. Called from /api/state so a cron is never needed.
  *
- * Concurrency: unique (identity_id, corner_index) plus ON CONFLICT DO NOTHING.
+ * Concurrency: unique (bid_id, corner_index) plus ON CONFLICT DO NOTHING.
  * Any number of viewers can race this and exactly one row is stored per hit.
+ * Keyed by bid so a returning occupant keeps adding to their lifetime total.
  */
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
@@ -42,7 +43,7 @@ export async function persistDueCorners(): Promise<number> {
         due.physics_started_at + make_interval(secs => gs * due.period_s)
       FROM due
       CROSS JOIN LATERAL generate_series(1, due.latest_index) AS gs
-      ON CONFLICT (identity_id, corner_index) DO NOTHING
+      ON CONFLICT (bid_id, corner_index) DO NOTHING
       RETURNING identity_id
     ),
     bumped AS (

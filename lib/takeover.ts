@@ -8,8 +8,8 @@
  *     serverless invocation that gets frozen or killed mid-flight.
  *
  * Each paid order ADDS its charge onto identities.paid_total_cents. Occupancy then
- * compares that running total to game_state.current_amount_cents — #1 is whoever has
- * paid the most, even if two checkouts raced with a stale version token.
+ * compares that running total to game_state.current_amount_cents — the screen
+ * belongs to whoever has paid the most. Rank on the board is hits, not dollars.
  */
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';

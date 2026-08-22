@@ -244,9 +244,10 @@ export const identityClicks = pgTable(
 /**
  * Corner hits, written lazily by /api/state.
  *
- * The unique constraint on (identity_id, corner_index) is the whole concurrency
- * story: any number of simultaneous readers can try to record the same hit and
- * exactly one row results.
+ * Unique on (bid_id, corner_index): one row per hit of this occupancy. The same
+ * identity can occupy again and keep accumulating — identity+index would collide
+ * on the second run's first corner. Concurrency is still "exactly one row": any
+ * number of readers can race the same (bid, index) and ON CONFLICT drops extras.
  */
 export const cornerHits = pgTable(
   'corner_hits',
@@ -258,13 +259,14 @@ export const cornerHits = pgTable(
     bidId: uuid('bid_id')
       .notNull()
       .references(() => bids.id),
-    /** Nth corner of this holder's run. Derived from elapsed time, never from position. */
+    /** Nth corner of this occupancy. Derived from elapsed time, never from position. */
     cornerIndex: integer('corner_index').notNull(),
     hitAt: timestamp('hit_at', { withTimezone: true }).notNull(),
     viewersApprox: integer('viewers_approx'),
   },
   (t) => [
-    unique('corner_hits_identity_index_unique').on(t.identityId, t.cornerIndex),
+    unique('corner_hits_bid_index_unique').on(t.bidId, t.cornerIndex),
+    index('corner_hits_identity_idx').on(t.identityId),
     index('corner_hits_hit_at_idx').on(t.hitAt.desc()),
   ],
 );
