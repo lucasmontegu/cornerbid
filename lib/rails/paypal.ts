@@ -191,6 +191,20 @@ export const payPalRail: PaymentRail = {
               shipping_preference: 'NO_SHIPPING',
               // "Pay Now" instead of "Continue" — there is no cart to review.
               user_action: 'PAY_NOW',
+              /*
+               * Land on the card form, not the sign-in screen.
+               *
+               * The default is NO_PREFERENCE, which lets PayPal show a returning
+               * buyer its login page — a password prompt standing between a
+               * one-click impulse and a $1 charge. GUEST_CHECKOUT opens on
+               * "pay with debit or credit card" instead; the buyer can still
+               * choose to sign in from there.
+               *
+               * Requires "PayPal Account Optional" to be ON in the merchant
+               * account (Account Settings -> Website payments -> Website
+               * preferences). With it off, PayPal ignores this and shows login.
+               */
+              landing_page: 'GUEST_CHECKOUT',
               return_url: `${appUrl}/success`,
               cancel_url: `${appUrl}/?canceled=1`,
             },
