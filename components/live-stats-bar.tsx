@@ -37,12 +37,22 @@ const POLL_MS = 25_000
  * animation with no effect and no second piece of state: React remounts that
  * node only when the number actually moved.
  */
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({
+  value,
+  label,
+  emphasis,
+}: {
+  value: string
+  label: string
+  emphasis?: boolean
+}) {
   return (
     <li className="flex items-baseline gap-1.5">
       <span
         key={value}
-        className="font-display text-sm font-semibold text-ink tabular-nums motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300"
+        className={`font-display font-semibold tabular-nums motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300 ${
+          emphasis ? 'text-base text-ink' : 'text-sm text-ink'
+        }`}
       >
         {value}
       </span>
@@ -147,8 +157,8 @@ export function LiveStatsBar({ initial }: { initial: LiveStats }) {
         >
           <PeopleOnline title={t('peopleOnline')} />
 
-          <Stat value={n(stats.cornersToday)} label={t('statsCorners')} />
-          <Stat value={n(stats.clicksToday)} label={t('statsClicks')} />
+          <Stat value={n(stats.cornersToday)} label={t('statsCorners')} emphasis />
+          <Stat value={n(stats.clicksToday)} label={t('statsClicks')} emphasis />
           <Stat value={formatUsd(stats.bidTodayCents)} label={t('statsBid')} />
         </ul>
 

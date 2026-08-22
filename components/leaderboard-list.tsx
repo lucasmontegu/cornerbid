@@ -3,12 +3,32 @@ import { formatUsd } from '@/lib/money'
 import { interpolate, messages, type Locale } from '@/lib/i18n'
 import type { RankingEntry } from '@/lib/leaderboard'
 
-function ago(locale: Locale, date: Date): string {
-  const copy = messages[locale]
-  const seconds = Math.max(0, (Date.now() - date.getTime()) / 1000)
-  if (seconds < 60) return copy.justNow
-  if (seconds < 3600) return interpolate(copy.minAgo, { n: Math.floor(seconds / 60) })
-  return interpolate(copy.hoursAgo, { n: Math.floor(seconds / 3600) })
+function Score({
+  value,
+  label,
+  ariaLabel,
+  featured,
+  locale,
+}: {
+  value: number
+  label: string
+  ariaLabel: string
+  featured?: boolean
+  locale: Locale
+}) {
+  return (
+    <div className="min-w-[3.5ch] text-end">
+      <p
+        aria-label={ariaLabel}
+        className={`font-display font-semibold tabular-nums ${
+          featured ? 'text-2xl text-brand-deep sm:text-3xl' : 'text-lg text-ink'
+        }`}
+      >
+        {value.toLocaleString(locale)}
+      </p>
+      <p className="text-[11px] text-hush">{label}</p>
+    </div>
+  )
 }
 
 function RankRow({
@@ -31,6 +51,10 @@ function RankRow({
         : featured === 3
           ? 'bg-brand-3 text-ink'
           : 'bg-paper text-ink shadow-[var(--shadow-border)]'
+  const bid = formatUsd(entry.amountCents)
+  const statusLine = entry.isCurrentHolder
+    ? interpolate(copy.occupyingBid, { status: copy.occupyingNow, bid })
+    : interpolate(copy.listedBid, { bid })
 
   return (
     <li>
@@ -38,7 +62,7 @@ function RankRow({
         href={`/go/${entry.identityId}`}
         target="_blank"
         rel="sponsored noopener noreferrer"
-        className={`flex gap-4 rounded-[28px] p-4 transition-[scale,box-shadow] duration-150 ease-out active:scale-[0.96] ${tint} ${
+        className={`flex items-center gap-3 rounded-[28px] p-4 transition-[scale,box-shadow] duration-150 ease-out active:scale-[0.96] sm:gap-4 ${tint} ${
           featured ? 'p-5' : ''
         }`}
       >
@@ -56,25 +80,27 @@ function RankRow({
           className="size-12 shrink-0 rounded-lg object-contain outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="truncate font-semibold">{entry.displayName}</span>
-            <span className={`shrink-0 font-semibold tabular-nums ${featured ? 'text-brand-deep' : 'text-ink'}`}>
-              {interpolate(copy.touchCount, { n: entry.cornerCount })}
-            </span>
-          </div>
+          <p className="truncate font-semibold">{entry.displayName}</p>
           {entry.description ? (
-            <p className="mt-1 line-clamp-2 text-sm text-hush">{entry.description}</p>
+            <p className="mt-0.5 line-clamp-1 text-sm text-hush">{entry.description}</p>
           ) : null}
-          {entry.isCurrentHolder ? (
-            <p className="mt-1 text-sm font-semibold">{copy.occupyingNow}</p>
-          ) : null}
-          <p className="mt-1 text-xs text-hush">
-            {interpolate(copy.rankingRowMeta, {
-              time: ago(locale, entry.heldAt),
-              bid: formatUsd(entry.amountCents),
-              visits: entry.clickCount,
-            })}
-          </p>
+          <p className="mt-1 text-xs text-hush">{statusLine}</p>
+        </div>
+        <div className="flex shrink-0 items-start gap-4 sm:gap-6">
+          <Score
+            value={entry.cornerCount}
+            label={copy.rankingHitsLabel}
+            ariaLabel={interpolate(copy.rankingHitsAria, { n: entry.cornerCount })}
+            featured={Boolean(featured)}
+            locale={locale}
+          />
+          <Score
+            value={entry.clickCount}
+            label={copy.rankingVisitsLabel}
+            ariaLabel={interpolate(copy.rankingVisitsAria, { n: entry.clickCount })}
+            featured={Boolean(featured)}
+            locale={locale}
+          />
         </div>
       </a>
     </li>

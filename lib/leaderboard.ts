@@ -124,7 +124,8 @@ async function getSeasonRanking(limit: number, season: Season): Promise<RankingE
   const rows = await db.execute(sql`
     SELECT
       i.id, i.display_name, i.description, i.image_url, i.source_url,
-      i.click_count, i.view_count,
+      coalesce(c.clicks, 0)::int AS click_count,
+      i.view_count,
       coalesce(s.hits, 0)::int AS corner_count,
       i.paid_total_cents AS amount_cents,
       coalesce(s.reached_at, max(coalesce(b.applied_at, b.settled_at, b.created_at))) AS held_at,
@@ -139,9 +140,16 @@ async function getSeasonRanking(limit: number, season: Season): Promise<RankingE
         AND hit_at < ${season.end.toISOString()}::timestamptz
       GROUP BY identity_id
     ) s ON s.identity_id = i.id
+    LEFT JOIN (
+      SELECT identity_id, count(*)::int AS clicks
+      FROM identity_clicks
+      WHERE clicked_at >= ${season.start.toISOString()}::timestamptz
+        AND clicked_at < ${season.end.toISOString()}::timestamptz
+      GROUP BY identity_id
+    ) c ON c.identity_id = i.id
     WHERE i.status <> 'rejected' AND g.id = 1 AND b.rail <> 'house'
       AND (s.hits > 0 OR b.id = g.current_bid_id)
-    GROUP BY i.id, s.hits, s.reached_at
+    GROUP BY i.id, s.hits, s.reached_at, c.clicks
     ORDER BY coalesce(s.hits, 0) DESC, held_at ASC
     LIMIT ${limit}
   `);
