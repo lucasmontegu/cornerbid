@@ -3,6 +3,14 @@ import { formatUsd } from '@/lib/money'
 import { interpolate, messages, type Locale } from '@/lib/i18n'
 import type { RankingEntry } from '@/lib/leaderboard'
 
+/**
+ * The one number on the row.
+ *
+ * There used to be two — hits and visits, side by side — and they competed with
+ * each other and with the name for the same glance. Rank is decided by hits
+ * alone, so hits is the only figure that earns this size; visits moved down to
+ * the meta line where it reads as context instead of a score.
+ */
 function Score({
   value,
   label,
@@ -17,16 +25,16 @@ function Score({
   locale: Locale
 }) {
   return (
-    <div className="min-w-[3.5ch] text-end">
+    <div className="min-w-[3.5ch] shrink-0 text-end">
       <p
         aria-label={ariaLabel}
-        className={`font-display font-semibold tabular-nums ${
-          featured ? 'text-2xl text-brand-deep sm:text-3xl' : 'text-lg text-ink'
+        className={`font-display leading-none font-semibold tabular-nums ${
+          featured ? 'text-3xl text-brand-deep sm:text-4xl' : 'text-xl text-ink'
         }`}
       >
         {value.toLocaleString(locale)}
       </p>
-      <p className="text-[11px] text-hush">{label}</p>
+      <p className="mt-1.5 text-[11px] text-hush">{label}</p>
     </div>
   )
 }
@@ -43,13 +51,15 @@ function RankRow({
   featured?: 1 | 2 | 3
 }) {
   const copy = messages[locale]
+  // #1 earns its prominence from an outline, not from a heavier fill. At 42% of
+  // the brand the old top tint swallowed the avatar and the text sitting on it.
   const tint =
     featured === 1
-      ? 'bg-brand-1 text-ink'
+      ? 'bg-brand-2 text-ink ring-1 ring-brand/45'
       : featured === 2
-        ? 'bg-brand-2 text-ink'
+        ? 'bg-brand-3 text-ink'
         : featured === 3
-          ? 'bg-brand-3 text-ink'
+          ? 'bg-brand-3/60 text-ink'
           : 'bg-paper text-ink shadow-[var(--shadow-border)]'
   const bid = formatUsd(entry.amountCents)
   const statusLine = entry.isCurrentHolder
@@ -77,31 +87,37 @@ function RankRow({
         <img
           src={entry.imageUrl}
           alt=""
-          className="size-12 shrink-0 rounded-lg object-contain outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
+          className={`shrink-0 rounded-full object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10 ${
+            featured ? 'size-14' : 'size-11'
+          }`}
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{entry.displayName}</p>
+          <p className={`truncate font-semibold ${featured ? 'text-lg' : ''}`}>
+            {entry.displayName}
+          </p>
           {entry.description ? (
             <p className="mt-0.5 line-clamp-1 text-sm text-hush">{entry.description}</p>
           ) : null}
-          <p className="mt-1 text-xs text-hush">{statusLine}</p>
+          <p className="mt-1 text-xs text-hush">
+            {statusLine}
+            {/* Coloured bullet, so the count reads as a separate fact from the
+                bid rather than another clause of the same sentence. */}
+            <span aria-hidden className="mx-1.5 text-brand">
+              •
+            </span>
+            <span aria-label={interpolate(copy.rankingVisitsAria, { n: entry.clickCount })}>
+              {entry.clickCount.toLocaleString(locale)}{' '}
+              {entry.clickCount === 1 ? copy.rankingVisitLabel : copy.rankingVisitsLabel}
+            </span>
+          </p>
         </div>
-        <div className="flex shrink-0 items-start gap-4 sm:gap-6">
-          <Score
-            value={entry.cornerCount}
-            label={copy.rankingHitsLabel}
-            ariaLabel={interpolate(copy.rankingHitsAria, { n: entry.cornerCount })}
-            featured={Boolean(featured)}
-            locale={locale}
-          />
-          <Score
-            value={entry.clickCount}
-            label={copy.rankingVisitsLabel}
-            ariaLabel={interpolate(copy.rankingVisitsAria, { n: entry.clickCount })}
-            featured={Boolean(featured)}
-            locale={locale}
-          />
-        </div>
+        <Score
+          value={entry.cornerCount}
+          label={copy.rankingHitsLabel}
+          ariaLabel={interpolate(copy.rankingHitsAria, { n: entry.cornerCount })}
+          featured={Boolean(featured)}
+          locale={locale}
+        />
       </a>
     </li>
   )

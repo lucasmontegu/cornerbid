@@ -71,7 +71,14 @@ function Stat({
 function PeopleOnline({ title }: { title: string }): ReactNode {
   return (
     <li
-      className="relative shrink-0 overflow-hidden"
+      /*
+       * -me-5 reclaims dead space, it is not a nudge. The frame is WIDGET_W
+       * wide but its text is only 216px and left-aligned inside it, so the
+       * extra 20px of count headroom renders as blank film on the right. Left
+       * in, the gap after the widget is 36px against 16px between every other
+       * stat, and the whole row reads as pushed off-centre.
+       */
+      className="relative -me-5 shrink-0 overflow-hidden"
       style={{ width: WIDGET_W, height: WIDGET_H }}
     >
       <iframe
