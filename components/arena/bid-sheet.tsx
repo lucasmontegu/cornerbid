@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Globe02Icon } from '@hugeicons/core-free-icons'
 import { useI18n } from '@/components/locale-provider'
+import { RailModal, type RailChoice } from '@/components/arena/rail-modal'
 import { clampBidCents, dollarsFromCents, formatUsd, parseBidDollars } from '@/lib/money'
 import { MIN_INCREMENT_CENTS, MIN_PLACE_CENTS } from '@/lib/pricing-constants'
 import type { IdentityPreview } from '@/lib/public-state'
@@ -30,6 +31,9 @@ export function BidSheet({
   const [preview, setPreview] = useState<IdentityPreview | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [railOpen, setRailOpen] = useState(false)
+  /** Amount frozen when the CTA opened the picker, so a later re-render cannot move it. */
+  const [pendingCents, setPendingCents] = useState<number | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -100,9 +104,12 @@ export function BidSheet({
     setAmountDraft(dollarsFromCents(next))
   }
 
-  async function checkout(cents = amountCents) {
+  async function checkout(cents: number, rail: RailChoice) {
     setBusy(true)
     setMessage(null)
+    // Only a real redirect leaves the picker up; every other outcome closes it so
+    // the error below it is visible.
+    let redirecting = false
     try {
       if (!preview) await previewIdentity(input)
       const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -113,6 +120,7 @@ export function BidSheet({
           input,
           expectedAmountCents: cents,
           timeZone,
+          rail,
         }),
       })
       const body = (await response.json()) as {
@@ -131,22 +139,34 @@ export function BidSheet({
         setMessage(t('mpCredentialsMissing'))
         return
       }
+      if (body.error === 'paypal_credentials_missing') {
+        setMessage(t('paypalCredentialsMissing'))
+        return
+      }
       if (!response.ok || !body.redirectUrl) {
         setMessage(body.message ?? body.error ?? t('checkoutFail'))
         return
       }
+      redirecting = true
       window.location.href = body.redirectUrl
     } finally {
       setBusy(false)
+      if (!redirecting) setRailOpen(false)
     }
   }
 
+  /** The CTA no longer starts a payment. It asks which rail first. */
   function onPayClick() {
-    void checkout(snapAmount())
+    setPendingCents(snapAmount())
+    setMessage(null)
+    setRailOpen(true)
   }
 
   const stepper =
     'grid size-9 shrink-0 place-items-center rounded-full bg-brand text-white transition-[scale,background-color,opacity] duration-150 ease-out hover:bg-brand-deep active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:pointer-events-none disabled:opacity-40'
+
+  /** Inline is the page hero and owns the document's only h1; the corner overlay repeats it. */
+  const Headline = layout === 'inline' ? 'h1' : 'p'
 
   const form = (
     <div className={layout === 'inline' ? 'w-full' : 'w-full max-w-xl rounded-[28px] bg-paper p-5 shadow-[var(--shadow-border)]'}>
@@ -157,53 +177,71 @@ export function BidSheet({
           </button>
         ) : null}
 
-        <p className="font-display text-balance text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+        <Headline className="font-display text-balance text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
           {t('fomoHeadline')}
-        </p>
+        </Headline>
+        <p className="mt-3 max-w-lg text-sm text-pretty text-hush sm:text-base">{t('fomoSub')}</p>
 
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+        <div className="mt-6 flex flex-col items-center gap-x-3 gap-y-2 sm:flex-row sm:justify-center">
           <p className="font-display text-2xl font-semibold text-ink sm:text-3xl">{t('claimFor')}</p>
-          <button
-            type="button"
-            aria-label={t('lowerBid')}
-            className={stepper}
-            disabled={amountCents <= floorCents}
-            onClick={() => stepBy(-MIN_INCREMENT_CENTS)}
-          >
-            −
-          </button>
-          <label className="relative">
-            <span className="pointer-events-none absolute top-1/2 left-0 -translate-y-1/2 font-display text-3xl font-semibold text-brand sm:text-4xl">
-              $
-            </span>
-            <input
-              inputMode="numeric"
-              autoComplete="off"
-              spellCheck={false}
-              aria-label={t('amountLabel')}
-              value={amountDraft}
-              onChange={(event) => setAmountDraft(event.target.value)}
-              onBlur={() => snapAmount()}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  snapAmount()
-                }
-              }}
-              className="w-[min(42vw,11rem)] bg-transparent py-1 pr-1 pl-7 font-display text-3xl font-semibold text-brand tabular-nums outline-none sm:text-4xl"
-            />
-          </label>
-          <button type="button" aria-label={t('raiseBid')} className={stepper} onClick={() => stepBy(MIN_INCREMENT_CENTS)}>
-            +
-          </button>
+          {/*
+            − $12 + are one control and never break across lines. Letting them
+            wrap independently reads as three unrelated widgets with a hole in
+            the middle, which is exactly what a fixed-width amount field caused.
+          */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              aria-label={t('lowerBid')}
+              className={stepper}
+              disabled={amountCents <= floorCents}
+              onClick={() => stepBy(-MIN_INCREMENT_CENTS)}
+            >
+              −
+            </button>
+            <label className="inline-flex items-baseline font-display text-3xl font-semibold text-brand sm:text-4xl">
+              <span aria-hidden>$</span>
+              <input
+                inputMode="numeric"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label={t('amountLabel')}
+                value={amountDraft}
+                // Sized to its own content so the + button sits against the
+                // number instead of across a gap. Safe in `ch` precisely because
+                // the field is tabular-nums: every digit is one `ch` wide.
+                style={{ width: `${Math.max(amountDraft.length, 1) + 0.5}ch` }}
+                onChange={(event) => setAmountDraft(event.target.value)}
+                onBlur={() => snapAmount()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    snapAmount()
+                  }
+                }}
+                className="bg-transparent py-1 font-display font-semibold text-brand tabular-nums outline-none"
+              />
+            </label>
+            <button type="button" aria-label={t('raiseBid')} className={stepper} onClick={() => stepBy(MIN_INCREMENT_CENTS)}>
+              +
+            </button>
+          </div>
         </div>
 
-        <p className="mt-3 max-w-xl text-sm text-brand/80">{t('amountHint')}</p>
+        <p className="mt-3 max-w-2xl text-sm text-balance text-hush">
+          {t('amountHint')}{' '}
+          <a
+            href="/rules"
+            className="text-brand underline decoration-from-font underline-offset-4 hover:text-brand-deep"
+          >
+            {t('amountHintMore')}
+          </a>
+        </p>
       </div>
 
-      <div className="mx-auto mt-6 flex w-full max-w-xl items-stretch gap-2">
+      <div className="mx-auto mt-6 flex w-full max-w-xl flex-col gap-2 sm:flex-row sm:items-stretch">
         <label
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-brand/35 bg-paper ps-3 pe-4 shadow-[var(--shadow-border)] transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-brand"
+          className="flex w-full min-w-0 items-center gap-2 rounded-full border border-brand/35 bg-paper ps-3 pe-4 shadow-[var(--shadow-border)] transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-brand sm:flex-1"
           style={{ height: BID_ROW_HEIGHT_PX }}
         >
           <span className="sr-only">{t('productLabel')}</span>
@@ -226,7 +264,8 @@ export function BidSheet({
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder={t('productPlaceholder')}
-            className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
+            // 16px on mobile or iOS Safari zooms the page when this focuses.
+            className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none sm:text-sm"
             onKeyDown={(event) => {
               if (event.key === 'Enter' && input && !busy) onPayClick()
             }}
@@ -234,7 +273,7 @@ export function BidSheet({
         </label>
         <button
           type="button"
-          className="shrink-0 rounded-full bg-brand px-5 text-sm font-semibold whitespace-nowrap text-white transition-[scale,background-color] duration-150 ease-out hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:scale-[0.96] disabled:opacity-50 sm:px-6"
+          className="w-full shrink-0 rounded-full bg-brand px-5 text-sm font-semibold whitespace-nowrap text-white transition-[scale,background-color] duration-150 ease-out hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto sm:px-6"
           style={{ height: BID_ROW_HEIGHT_PX }}
           disabled={busy || !input || chargeCents <= 0}
           onClick={onPayClick}
@@ -257,9 +296,23 @@ export function BidSheet({
         </p>
       ) : null}
 
-      {message ? <p className="mx-auto mt-3 max-w-xl text-xs text-red-600">{message}</p> : null}
+      {/* Stable node so a repeated checkout error still announces. */}
+      <p
+        role="alert"
+        className="mx-auto mt-3 max-w-xl text-center text-xs text-destructive empty:mt-0"
+      >
+        {message}
+      </p>
 
       <p className="mx-auto mt-3 max-w-xl text-center text-[11px] leading-relaxed text-hush">{t('bidFineprint')}</p>
+
+      <RailModal
+        open={railOpen}
+        priceLabel={formatUsd(chargeCents)}
+        busy={busy}
+        onChoose={(rail) => void checkout(pendingCents ?? amountCents, rail)}
+        onClose={() => setRailOpen(false)}
+      />
     </div>
   )
 

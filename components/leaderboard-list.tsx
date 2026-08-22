@@ -102,7 +102,29 @@ export function LeaderboardList({
   ranking: RankingEntry[]
   locale: Locale
 }) {
-  if (ranking.length === 0) return null
+  const copy = messages[locale]
+
+  // Returning null left a `mt-10` wrapper holding an unexplained gap between
+  // the activity cards and the footer. An empty board is a state, not an
+  // absence — and on a brand-new board it is the most persuasive one.
+  if (ranking.length === 0) {
+    return (
+      <div id="leaderboard" className="rounded-[28px] border-2 border-dashed border-line px-6 py-10 text-center">
+        <h2 className="font-display text-lg font-semibold text-balance text-ink">
+          {copy.leaderboardEmptyTitle}
+        </h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-pretty text-hush">
+          {copy.leaderboardEmptyBody}
+        </p>
+        <a
+          href="#bid"
+          className="mt-5 inline-flex h-11 items-center rounded-full bg-brand px-6 text-sm font-semibold text-white transition-[scale,background-color] duration-150 ease-out hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:scale-[0.96]"
+        >
+          {copy.leaderboardEmptyCta}
+        </a>
+      </div>
+    )
+  }
 
   const featured = ranking.slice(0, 3)
   const rest = ranking.slice(3)

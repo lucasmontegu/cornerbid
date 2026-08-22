@@ -10,6 +10,7 @@ import {
   assertValidParams,
   bounceCountAt,
   colorAt,
+  PLATE_PALETTE,
   cornerIndexAt,
   cornerPeriodSeconds,
   cornerTimeAt,
@@ -217,12 +218,23 @@ describe('plate colour', () => {
     expect(bounceCountAt(600, params)).toBeGreaterThan(bounceCountAt(60, params));
   });
 
-  test('always emits a usable hsl colour', () => {
+  test('only ever emits a colour from the DVD palette', () => {
     for (const params of sampleTable(20)) {
       for (const t of [0, 7.3, 61, 480, 903]) {
-        expect(colorAt(t, params)).toMatch(/^hsl\(\d+(\.\d+)? 88% 62%\)$/);
+        expect(PLATE_PALETTE).toContain(colorAt(t, params));
       }
     }
+  });
+
+  test('a bounce always moves the plate off its current colour', () => {
+    const params = PARAM_TABLE[42]!;
+    const traverseY = (TRAVERSE_X * params.q) / params.p;
+    // Straddle the first horizontal bounce, which is one bounce and no more.
+    expect(bounceCountAt(TRAVERSE_X + 0.01, params)).toBe(
+      bounceCountAt(TRAVERSE_X - 0.01, params) + 1,
+    );
+    expect(colorAt(TRAVERSE_X + 0.01, params)).not.toBe(colorAt(TRAVERSE_X - 0.01, params));
+    expect(traverseY).toBeGreaterThan(0);
   });
 });
 

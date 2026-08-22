@@ -48,7 +48,7 @@ export const bidStatusEnum = pgEnum('bid_status', [
  * the slot at $0 so that "nobody is holding it" never becomes a special case
  * downstream. It is never settled, refunded or captured.
  */
-export const paymentRailEnum = pgEnum('payment_rail', ['polar', 'mercadopago', 'house']);
+export const paymentRailEnum = pgEnum('payment_rail', ['polar', 'mercadopago', 'paypal', 'house']);
 
 export const moderationActionEnum = pgEnum('moderation_action', [
   'rejected',

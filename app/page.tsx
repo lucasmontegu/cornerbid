@@ -1,14 +1,17 @@
 import { GameLiveProvider } from '@/components/game-live';
 import { LiveBidSheet } from '@/components/live-bid-sheet';
 import { LiveLeaderboard } from '@/components/live-leaderboard';
+import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { ViewBeacon } from '@/components/view-beacon';
-import { VisitorPill } from '@/components/visitor-pill';
+import { LiveStatsBar } from '@/components/live-stats-bar';
 import { getRanking, getRecentActivity, getTrending } from '@/lib/leaderboard';
 import { getDataFastVisitorsSinceLaunch } from '@/lib/datafast';
+import { getLiveStats } from '@/lib/live-stats';
 import { interpolate, messages } from '@/lib/i18n';
 import { getLocale } from '@/lib/i18n-server';
 import { getQuote } from '@/lib/pricing';
+import { getHouseRow } from '@/lib/revenue';
 import { cornerPeriodSeconds } from '@/lib/physics';
 import { formatUsd } from '@/lib/money';
 import { db } from '@/db';
@@ -62,13 +65,16 @@ export default async function Home() {
     return vars ? interpolate(template, vars) : template;
   };
 
-  const [snapshot, trending, ranking, activity, visitors] = await Promise.all([
-    loadSnapshot(),
-    getTrending(),
-    getRanking(100),
-    getRecentActivity(),
-    getDataFastVisitorsSinceLaunch(),
-  ]);
+  const [snapshot, trending, ranking, activity, visitors, house, liveStats] =
+    await Promise.all([
+      loadSnapshot(),
+      getTrending(),
+      getRanking(100),
+      getRecentActivity(),
+      getDataFastVisitorsSinceLaunch(),
+      getHouseRow(),
+      getLiveStats(),
+    ]);
 
   if (!snapshot) {
     return (
@@ -86,7 +92,7 @@ export default async function Home() {
   }
 
   return (
-    <main className="min-h-dvh bg-paper text-ink">
+    <div className="min-h-dvh bg-paper text-ink">
       <a
         href="#bid"
         className="sr-only focus:not-sr-only focus:absolute focus:z-20 focus:m-3 focus:rounded-full focus:bg-brand focus:px-4 focus:py-2 focus:text-white"
@@ -98,8 +104,9 @@ export default async function Home() {
 
       <SiteHeader locale={locale} />
 
-      <div className="relative z-10 px-5 sm:px-8">
-        <VisitorPill locale={locale} visitorsSinceLaunch={visitors} />
+      <main>
+      <div className="relative z-10">
+        <LiveStatsBar initial={liveStats} />
       </div>
 
       <section id="bid" className="relative z-10 mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
@@ -158,7 +165,10 @@ export default async function Home() {
           <LiveLeaderboard ranking={ranking} locale={locale} />
         </div>
       </section>
+      </main>
+
+      <SiteFooter locale={locale} house={house} visitorsSinceLaunch={visitors} />
       </GameLiveProvider>
-    </main>
+    </div>
   );
 }

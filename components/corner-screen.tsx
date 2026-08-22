@@ -115,10 +115,11 @@ export function CornerScreen({
             height: VIEWPORT.logoHeight,
             willChange: 'transform',
           }}
-          className="pointer-events-auto absolute top-0 left-0 grid place-items-center rounded-2xl border-4 p-4
-                     [border-color:var(--plate-color)]
-                     [background:color-mix(in_oklab,var(--plate-color)_28%,white)]
-                     [box-shadow:0_12px_40px_-8px_color-mix(in_oklab,var(--plate-color)_55%,black)]"
+          // Flat saturated block, like the DVD logo itself: no ring, no glow, no
+          // radius. The old tinted-and-shadowed plate read as a modern app card,
+          // which is the one thing a screensaver never looked like.
+          className="pointer-events-auto absolute top-0 left-0 grid place-items-center p-4
+                     [background:var(--plate-color)]"
         >
           {/*
             Deliberately a plain <img>: the URL is a hotlinked third-party asset, so

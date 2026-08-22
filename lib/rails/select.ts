@@ -1,5 +1,6 @@
 /**
- * Mercado Pago Checkout Pro is the only live checkout rail.
+ * Legacy heuristic. The rail is now an explicit buyer choice in the bid modal;
+ * this resolver is retained only for its tests and selects nothing live.
  *
  * Polar files remain in the repo unused. Argentina hints are not a checkout
  * gate. Missing MP env must 503 — never fall through to Polar.

@@ -196,15 +196,34 @@ export function bounceCountAt(elapsedSeconds: number, params: PhysicsParams): nu
 }
 
 /**
+ * The flat, saturated fills of the original DVD screensaver.
+ *
+ * A fixed cycle rather than a generated hue: the plate is meant to read as the
+ * DVD block people already recognise, and an arbitrary hue lands on muddy
+ * olives and browns that never appeared on that screen.
+ *
+ * Order matters. Consecutive entries are far apart on the wheel, so stepping by
+ * one bounce always produces a visibly different plate.
+ */
+export const PLATE_PALETTE = [
+  '#F5333F', // red
+  '#FFE100', // yellow
+  '#00D2D8', // cyan
+  '#FF3EA5', // magenta
+  '#3BE07A', // green
+  '#8B5CF6', // brand violet
+] as const;
+
+export type PlateColor = (typeof PLATE_PALETTE)[number];
+
+/**
  * Plate colour, changing on every bounce like the original DVD screensaver.
  *
- * Hues advance by the golden angle so consecutive colours stay far apart and the
- * sequence takes a long time to visibly repeat.
+ * Deterministic: the same bounce count yields the same fill on every client.
  */
-export function colorAt(elapsedSeconds: number, params: PhysicsParams): string {
-  const GOLDEN_ANGLE = 137.508;
-  const hue = (bounceCountAt(elapsedSeconds, params) * GOLDEN_ANGLE) % 360;
-  return `hsl(${hue.toFixed(1)} 88% 62%)`;
+export function colorAt(elapsedSeconds: number, params: PhysicsParams): PlateColor {
+  const index = bounceCountAt(elapsedSeconds, params) % PLATE_PALETTE.length;
+  return PLATE_PALETTE[index]!;
 }
 
 /** Guard for values coming out of the database. */

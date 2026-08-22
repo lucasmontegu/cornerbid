@@ -13,6 +13,7 @@ import { parseIdentityInput, resolveIdentity } from '@/lib/identity';
 import { seedFromBidId } from '@/lib/physics';
 import { getQuote, MIN_PLACE_CENTS } from '@/lib/pricing';
 import { isMercadoPagoConfigured, mercadoPagoRail } from '@/lib/rails/mercadopago';
+import { isPayPalConfigured, payPalRail } from '@/lib/rails/paypal';
 import { chargeDeltaCents, nextStakeCents } from '@/lib/raise';
 import { getCommittedCents } from '@/lib/stake';
 import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit';
@@ -23,6 +24,8 @@ const CheckoutRequest = z.object({
   expectedAmountCents: z.number().int().min(MIN_PLACE_CENTS).max(99_999_999_00),
   country: z.string().length(2).optional(),
   timeZone: z.string().max(80).optional(),
+  /** Buyer's pick from the rail modal. Absent means Mercado Pago, the historic default. */
+  rail: z.enum(['mercadopago', 'paypal']).optional(),
 });
 
 function httpStatusFromUnknown(error: unknown): number | undefined {
@@ -36,6 +39,13 @@ function httpStatusFromUnknown(error: unknown): number | undefined {
 function checkoutFailureResponse(error: unknown): Response {
   const detail = error instanceof Error ? error.message : String(error);
   console.error('[checkout]', detail);
+
+  if (/PAYPAL_CLIENT_ID|PAYPAL_CLIENT_SECRET|PAYPAL_WEBHOOK_ID|PAYPAL_ENV/.test(detail)) {
+    return Response.json(
+      { error: 'paypal_credentials_missing', message: 'PayPal is not configured' },
+      { status: 503 },
+    );
+  }
 
   if (/MP_ACCESS_TOKEN|MP_WEBHOOK_SECRET|MP_USD_ARS_RATE|NEXT_PUBLIC_APP_URL/.test(detail)) {
     return Response.json(
@@ -74,8 +84,9 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsedBody.success) {
     return Response.json({ error: 'Invalid request' }, { status: 400 });
   }
-  const { input, email, expectedAmountCents } = parsedBody.data;
+  const { input, email, expectedAmountCents, rail: requestedRail } = parsedBody.data;
   const receiptEmail = email ?? '';
+  const selectedRail = requestedRail ?? 'mercadopago';
 
   const parsedIdentity = parseIdentityInput(input);
   if (!parsedIdentity) {
@@ -89,7 +100,16 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'That listing is not allowed.' }, { status: 422 });
   }
 
-  if (!isMercadoPagoConfigured()) {
+  // Each rail gates on its own env. A missing rail must 503 for that rail only —
+  // never silently redirect the buyer to a provider they did not choose.
+  if (selectedRail === 'paypal' && !isPayPalConfigured()) {
+    return Response.json(
+      { error: 'paypal_credentials_missing', message: 'PayPal is not configured' },
+      { status: 503 },
+    );
+  }
+
+  if (selectedRail === 'mercadopago' && !isMercadoPagoConfigured()) {
     return Response.json(
       {
         error: 'mp_credentials_missing',
@@ -152,11 +172,13 @@ export async function POST(request: Request): Promise<Response> {
       chargeAmountCents,
       expectedVersion,
       seed: seedFromBidId(bidId),
-      rail: 'mercadopago',
+      rail: selectedRail,
       status: 'created',
     });
 
-    const intent = await mercadoPagoRail.createIntent({
+    const rail = selectedRail === 'paypal' ? payPalRail : mercadoPagoRail;
+
+    const intent = await rail.createIntent({
       bidId,
       quotedAmountCents: quotedTotalCents,
       chargeAmountCents,
@@ -175,7 +197,7 @@ export async function POST(request: Request): Promise<Response> {
       bidId,
       amountCents: quotedTotalCents,
       chargeAmountCents,
-      rail: 'mercadopago',
+      rail: selectedRail,
       redirectUrl: intent.redirectUrl,
       identity: {
         displayName: resolved.displayName,

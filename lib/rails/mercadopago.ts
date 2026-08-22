@@ -84,6 +84,8 @@ export const mercadoPagoRail: PaymentRail = {
           },
         ],
         payer: input.email ? { email: input.email } : undefined,
+        // Card statement only (≤13 chars in AR). Checkout Pro header is the collector account.
+        statement_descriptor: 'CORNERBID',
         external_reference: input.bidId,
         metadata: {
           bid_id: input.bidId,
