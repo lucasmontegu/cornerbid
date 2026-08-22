@@ -8,6 +8,25 @@ export const DATAFAST_DOMAIN = 'cornerbid.lol';
 /** Logo violet. Kept for any embed that still needs the site's accent. */
 export const BRAND_HEX = '8B5CF6';
 
+export const DATAFAST_WIDGET_ID = '6a88a2d8ec7bb6997732bb51';
+
+/**
+ * Realtime "people online" embed.
+ *
+ * An iframe rather than `/api/v1/analytics/realtime` on purpose: the widget is
+ * public, so it renders on localhost and on preview deployments with no
+ * DATAFAST_API_KEY present. The API route returns null without that key, which
+ * made the number invisible in exactly the environments where it gets looked at
+ * most.
+ *
+ * `mainTextSize` is in px and drives the widget's own height, so the wrapper's
+ * fixed size below is derived from it — not guessed.
+ */
+export function dataFastRealtimeWidgetUrl(colorHex = BRAND_HEX, mainTextSize = 16): string {
+  const color = encodeURIComponent(`#${colorHex.replace(/^#/, '')}`);
+  return `https://datafa.st/widgets/${DATAFAST_WIDGET_ID}/realtime?mainTextSize=${mainTextSize}&primaryColor=${color}`;
+}
+
 /**
  * Last good value per endpoint.
  *
@@ -46,18 +65,6 @@ async function visitorCount(path: string, ttlMs: number): Promise<number | null>
   } catch {
     return hit?.value ?? null;
   }
-}
-
-/**
- * People with pageview activity in the last 10 minutes — DataFast's own
- * realtime window, not something derived here.
- *
- * Null when DATAFAST_API_KEY is absent, which is the normal local state. Every
- * caller must render without it rather than showing a zero, because "0 watching"
- * is a claim and a missing key is not evidence for it.
- */
-export async function getDataFastVisitorsOnline(): Promise<number | null> {
-  return visitorCount('/analytics/realtime?fields=visitors', 15_000);
 }
 
 /** All-time unique visitors. Shown in the footer's house row. */

@@ -9,18 +9,19 @@
 import { sql } from 'drizzle-orm';
 
 import { db } from '@/db';
-import { getDataFastVisitorsOnline } from '@/lib/datafast';
 
+/**
+ * Board numbers only. "People online" is not here: it comes from the public
+ * DataFast realtime widget, which needs no API key and therefore works in every
+ * environment.
+ */
 export interface LiveStats {
-  /** DataFast realtime. Null when unavailable — render nothing, never a zero. */
-  visitorsOnline: number | null;
   cornersToday: number;
   clicksToday: number;
   bidTodayCents: number;
 }
 
 export const EMPTY_LIVE_STATS: LiveStats = {
-  visitorsOnline: null,
   cornersToday: 0,
   clicksToday: 0,
   bidTodayCents: 0,
@@ -33,7 +34,7 @@ export const EMPTY_LIVE_STATS: LiveStats = {
  * not share — the site has no single timezone. A rolling window is always
  * populated and always means the same thing to everyone reading it.
  */
-async function boardStats(): Promise<Omit<LiveStats, 'visitorsOnline'>> {
+async function boardStats(): Promise<LiveStats> {
   try {
     const rows = await db.execute(sql`
       SELECT
@@ -61,9 +62,5 @@ async function boardStats(): Promise<Omit<LiveStats, 'visitorsOnline'>> {
 }
 
 export async function getLiveStats(): Promise<LiveStats> {
-  const [board, visitorsOnline] = await Promise.all([
-    boardStats(),
-    getDataFastVisitorsOnline(),
-  ]);
-  return { ...board, visitorsOnline };
+  return boardStats();
 }

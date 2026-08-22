@@ -3,8 +3,25 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { useI18n } from '@/components/locale-provider'
+import { BRAND_HEX, dataFastRealtimeWidgetUrl } from '@/lib/datafast'
 import type { LiveStats } from '@/lib/live-stats'
 import { formatUsd } from '@/lib/money'
+
+/**
+ * Widget geometry, measured rather than guessed.
+ *
+ * At mainTextSize=14 the embed renders "0 people visiting this site now" in a
+ * 216x21 content box inside a 25px-tall document. The wrapper carries a real
+ * size because the iframe is told to fill 100% of its parent, and `height:100%`
+ * inside an auto-height box collapses to zero — the widget would vanish.
+ *
+ * 14px matches the surrounding stats (text-sm); the DataFast default of 16
+ * makes the embed visibly larger than everything beside it. The extra width
+ * over 216 is headroom for the count growing past one digit.
+ */
+const WIDGET_TEXT_PX = 14
+const WIDGET_W = 236
+const WIDGET_H = 26
 
 /**
  * Slow on purpose. These are 24h aggregates plus a 10-minute realtime window —
@@ -34,13 +51,39 @@ function Stat({ value, label }: { value: string; label: string }) {
   )
 }
 
-/** Green pulse. Purely decorative — the count beside it is what states the fact. */
-function LiveDot(): ReactNode {
+/**
+ * DataFast's own realtime embed.
+ *
+ * Public widget, so it needs no API key and renders identically on localhost,
+ * preview and production. It brings its own live dot and count; the site only
+ * supplies the accent colour and a stable box to sit in.
+ */
+function PeopleOnline({ title }: { title: string }): ReactNode {
   return (
-    <span aria-hidden className="relative inline-flex size-2 self-center">
-      <span className="absolute inline-flex size-full rounded-full bg-live opacity-70 motion-safe:animate-ping" />
-      <span className="relative inline-flex size-2 rounded-full bg-live" />
-    </span>
+    <li
+      className="relative shrink-0 overflow-hidden"
+      style={{ width: WIDGET_W, height: WIDGET_H }}
+    >
+      <iframe
+        src={dataFastRealtimeWidgetUrl(BRAND_HEX, WIDGET_TEXT_PX)}
+        // The frame's own title is its accessible name — an aria-label on the
+        // wrapper would not be announced.
+        title={title}
+        loading="lazy"
+        width={WIDGET_W}
+        height={WIDGET_H}
+        /*
+         * The invert filter is not decoration. DataFast hardcodes the label to
+         * near-black (oklch(0.269 0 0)) and exposes no text-colour parameter, so
+         * on the dark theme it would be black text on a dark pill — invisible.
+         * Inverting lifts it to near-white, and the 180deg hue rotation puts the
+         * accent dot back on its original side of the wheel instead of leaving
+         * it the complementary colour.
+         */
+        className="absolute inset-0 h-full w-full border-0 bg-transparent dark:[filter:invert(1)_hue-rotate(180deg)]"
+        style={{ background: 'transparent' }}
+      />
+    </li>
   )
 }
 
@@ -102,20 +145,7 @@ export function LiveStatsBar({ initial }: { initial: LiveStats }) {
           aria-label={t('statsLabel')}
           className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5"
         >
-          {/* Omitted rather than zeroed when DataFast is unreachable: "0 watching"
-              is a claim, and a missing API key is not evidence for it. */}
-          {stats.visitorsOnline !== null ? (
-            <li className="flex items-baseline gap-1.5">
-              <LiveDot />
-              <span
-                key={stats.visitorsOnline}
-                className="font-display text-sm font-semibold text-ink tabular-nums motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
-              >
-                {n(stats.visitorsOnline)}
-              </span>
-              <span className="text-sm text-hush">{t('statsWatching')}</span>
-            </li>
-          ) : null}
+          <PeopleOnline title={t('peopleOnline')} />
 
           <Stat value={n(stats.cornersToday)} label={t('statsCorners')} />
           <Stat value={n(stats.clicksToday)} label={t('statsClicks')} />

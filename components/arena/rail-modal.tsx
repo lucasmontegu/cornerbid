@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef } from 'react'
 import { useI18n } from '@/components/locale-provider'
+import { detectArgentinaClient } from '@/lib/rails/select'
 
 export type RailChoice = 'mercadopago' | 'paypal'
 
@@ -75,6 +76,34 @@ export function RailModal({
   const option =
     'flex w-full items-center gap-3 rounded-2xl border border-line bg-paper p-4 text-start transition-[scale,border-color,background-color] duration-150 ease-out hover:border-brand hover:bg-mist active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:pointer-events-none disabled:opacity-50'
 
+  /*
+   * PayPal decides guest checkout from the buyer's IP. An Argentine buyer sent
+   * to PayPal does not get a card form — they get an account-opening form
+   * asking for DNI and date of birth, and most of them leave. Mercado Pago
+   * takes the same card with no account at all.
+   *
+   * So the order is not cosmetic: whichever option sits first is the one most
+   * people click. Safe to read during render because the modal only mounts
+   * after a click, and the helper guards for a missing navigator.
+   */
+  const argentina = detectArgentinaClient()
+
+  const paypal = {
+    rail: 'paypal' as const,
+    badge: 'PP',
+    label: t('railPayPal'),
+    hint: argentina ? t('railPayPalHintAr') : t('railPayPalHint'),
+    recommended: !argentina,
+  }
+  const mercadopago = {
+    rail: 'mercadopago' as const,
+    badge: 'MP',
+    label: t('railMercadoPago'),
+    hint: t('railMercadoPagoHint'),
+    recommended: argentina,
+  }
+  const options = argentina ? [mercadopago, paypal] : [paypal, mercadopago]
+
   return (
     <div
       className="fixed inset-0 z-[90] grid place-items-end overscroll-contain bg-ink/40 p-4 sm:place-items-center"
@@ -99,36 +128,31 @@ export function RailModal({
         </p>
 
         <div className="mt-5 grid gap-3">
-          <button
-            ref={firstRef}
-            type="button"
-            className={option}
-            disabled={busy}
-            onClick={() => onChoose('paypal')}
-          >
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-mist font-display text-base font-semibold text-brand-deep">
-              PP
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-semibold text-ink">{t('railPayPal')}</span>
-              <span className="block text-xs text-hush">{t('railPayPalHint')}</span>
-            </span>
-          </button>
-
-          <button
-            type="button"
-            className={option}
-            disabled={busy}
-            onClick={() => onChoose('mercadopago')}
-          >
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-mist font-display text-base font-semibold text-brand-deep">
-              MP
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-semibold text-ink">{t('railMercadoPago')}</span>
-              <span className="block text-xs text-hush">{t('railMercadoPagoHint')}</span>
-            </span>
-          </button>
+          {options.map((entry, index) => (
+            <button
+              key={entry.rail}
+              ref={index === 0 ? firstRef : undefined}
+              type="button"
+              className={option}
+              disabled={busy}
+              onClick={() => onChoose(entry.rail)}
+            >
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-mist font-display text-base font-semibold text-brand-deep">
+                {entry.badge}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <span className="font-semibold text-ink">{entry.label}</span>
+                  {entry.recommended ? (
+                    <span className="rounded-full bg-brand-3 px-2 py-0.5 text-[11px] font-semibold text-brand-deep">
+                      {t('railRecommended')}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="mt-0.5 block text-xs text-pretty text-hush">{entry.hint}</span>
+              </span>
+            </button>
+          ))}
         </div>
 
         <button
