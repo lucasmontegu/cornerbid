@@ -139,8 +139,8 @@ export function BidSheet({
         setMessage(t('mpCredentialsMissing'))
         return
       }
-      if (body.error === 'paypal_credentials_missing') {
-        setMessage(t('paypalCredentialsMissing'))
+      if (body.error === 'polar_credentials_missing') {
+        setMessage(t('polarCredentialsMissing'))
         return
       }
       if (!response.ok || !body.redirectUrl) {

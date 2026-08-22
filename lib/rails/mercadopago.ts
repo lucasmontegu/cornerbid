@@ -33,7 +33,7 @@ function requireEnv(name: string): string {
   return value;
 }
 
-/** True when Checkout Pro can create a preference. Missing env returns 503 — never Polar. */
+/** True when Checkout Pro can create a preference. Missing env returns 503 for this rail only. */
 export function isMercadoPagoConfigured(): boolean {
   const rate = Number(process.env.MP_USD_ARS_RATE);
   return Boolean(

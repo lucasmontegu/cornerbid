@@ -1,8 +1,8 @@
 /**
- * Creates a bid and hands back a Mercado Pago Checkout Pro URL.
+ * Creates a bid and hands back a Polar or Mercado Pago checkout URL.
  *
- * Polar is not a live checkout path. Missing MP credentials return 503 — never
- * a silent Polar fallback.
+ * Each rail gates on its own env. A missing rail must 503 for that rail only —
+ * never silently redirect the buyer to a provider they did not choose.
  */
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -13,7 +13,7 @@ import { parseIdentityInput, resolveIdentity } from '@/lib/identity';
 import { seedFromBidId } from '@/lib/physics';
 import { getQuote, MIN_PLACE_CENTS } from '@/lib/pricing';
 import { isMercadoPagoConfigured, mercadoPagoRail } from '@/lib/rails/mercadopago';
-import { isPayPalConfigured, payPalRail } from '@/lib/rails/paypal';
+import { isPolarConfigured, polarRail } from '@/lib/rails/polar';
 import { chargeDeltaCents, nextStakeCents } from '@/lib/raise';
 import { getCommittedCents } from '@/lib/stake';
 import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit';
@@ -24,8 +24,8 @@ const CheckoutRequest = z.object({
   expectedAmountCents: z.number().int().min(MIN_PLACE_CENTS).max(99_999_999_00),
   country: z.string().length(2).optional(),
   timeZone: z.string().max(80).optional(),
-  /** Buyer's pick from the rail modal. Absent means Mercado Pago, the historic default. */
-  rail: z.enum(['mercadopago', 'paypal']).optional(),
+  /** Buyer's pick from the rail modal. Absent means Polar, the global rail. */
+  rail: z.enum(['mercadopago', 'polar']).optional(),
 });
 
 function httpStatusFromUnknown(error: unknown): number | undefined {
@@ -40,9 +40,9 @@ function checkoutFailureResponse(error: unknown): Response {
   const detail = error instanceof Error ? error.message : String(error);
   console.error('[checkout]', detail);
 
-  if (/PAYPAL_CLIENT_ID|PAYPAL_CLIENT_SECRET|PAYPAL_WEBHOOK_ID|PAYPAL_ENV/.test(detail)) {
+  if (/POLAR_ACCESS_TOKEN|POLAR_PRODUCT_ID|POLAR_WEBHOOK_SECRET|POLAR_SERVER/.test(detail)) {
     return Response.json(
-      { error: 'paypal_credentials_missing', message: 'PayPal is not configured' },
+      { error: 'polar_credentials_missing', message: 'Polar is not configured' },
       { status: 503 },
     );
   }
@@ -86,7 +86,7 @@ export async function POST(request: Request): Promise<Response> {
   }
   const { input, email, expectedAmountCents, rail: requestedRail } = parsedBody.data;
   const receiptEmail = email ?? '';
-  const selectedRail = requestedRail ?? 'mercadopago';
+  const selectedRail = requestedRail ?? 'polar';
 
   const parsedIdentity = parseIdentityInput(input);
   if (!parsedIdentity) {
@@ -102,9 +102,9 @@ export async function POST(request: Request): Promise<Response> {
 
   // Each rail gates on its own env. A missing rail must 503 for that rail only —
   // never silently redirect the buyer to a provider they did not choose.
-  if (selectedRail === 'paypal' && !isPayPalConfigured()) {
+  if (selectedRail === 'polar' && !isPolarConfigured()) {
     return Response.json(
-      { error: 'paypal_credentials_missing', message: 'PayPal is not configured' },
+      { error: 'polar_credentials_missing', message: 'Polar is not configured' },
       { status: 503 },
     );
   }
@@ -176,7 +176,7 @@ export async function POST(request: Request): Promise<Response> {
       status: 'created',
     });
 
-    const rail = selectedRail === 'paypal' ? payPalRail : mercadoPagoRail;
+    const rail = selectedRail === 'polar' ? polarRail : mercadoPagoRail;
 
     const intent = await rail.createIntent({
       bidId,

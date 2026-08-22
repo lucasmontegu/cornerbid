@@ -2,8 +2,8 @@
  * Legacy heuristic. The rail is now an explicit buyer choice in the bid modal;
  * this resolver is retained only for its tests and selects nothing live.
  *
- * Polar files remain in the repo unused. Argentina hints are not a checkout
- * gate. Missing MP env must 503 — never fall through to Polar.
+ * Argentina hints are not a checkout gate. Missing env on a chosen rail must
+ * 503 — never silently fall through to the other provider.
  */
 import type { SettleableRail } from '@/db/schema';
 
@@ -74,7 +74,7 @@ export function detectArgentinaClient(): boolean {
   }
 }
 
-/** Always Mercado Pago. Polar is not a live checkout path. */
+/** Unused live path. Kept so existing tests stay pinned to Mercado Pago. */
 export function resolveCheckoutRail(
   _preferred?: PreferredRail,
   _argentina?: boolean,

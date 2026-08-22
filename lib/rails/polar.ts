@@ -1,5 +1,5 @@
 /**
- * Polar rail.
+ * Polar rail — global card checkout.
  *
  * The product must be configured as **Pay what you want** (`amountType: 'custom'`),
  * not Fixed price. The `amount` field on a checkout session only takes effect on a
@@ -8,6 +8,12 @@
  *
  * Set the product's `minimum_amount` to 100 ($1 floor). There is no product ceiling
  * in CornerBid; raise Polar's `maximum_amount` in the dashboard if a PWYW cap remains.
+ *
+ * Env:
+ *   POLAR_ACCESS_TOKEN     required — organization access token
+ *   POLAR_PRODUCT_ID       required — the PWYW product
+ *   POLAR_WEBHOOK_SECRET   required — webhook signing secret
+ *   POLAR_SERVER           exactly 'production' or 'sandbox'
  */
 import { Polar } from '@polar-sh/sdk';
 import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
@@ -25,11 +31,27 @@ function requireEnv(name: string): string {
   return value;
 }
 
+/** True when Polar can create a checkout. Missing env must 503, never silently fall back. */
+export function isPolarConfigured(): boolean {
+  const server = process.env.POLAR_SERVER?.trim().toLowerCase();
+  return Boolean(
+    process.env.POLAR_ACCESS_TOKEN &&
+      process.env.POLAR_PRODUCT_ID &&
+      process.env.POLAR_WEBHOOK_SECRET &&
+      process.env.NEXT_PUBLIC_APP_URL &&
+      (server === 'production' || server === 'sandbox'),
+  );
+}
+
 let client: Polar | undefined;
 function polar(): Polar {
+  const server = requireEnv('POLAR_SERVER').trim().toLowerCase();
+  if (server !== 'production' && server !== 'sandbox') {
+    throw new Error(`POLAR_SERVER must be 'production' or 'sandbox'`);
+  }
   client ??= new Polar({
     accessToken: requireEnv('POLAR_ACCESS_TOKEN'),
-    server: process.env.POLAR_SERVER === 'production' ? 'production' : 'sandbox',
+    server,
   });
   return client;
 }
@@ -38,7 +60,7 @@ export const polarRail: PaymentRail = {
   name: 'polar',
 
   async createIntent(input: CreateIntentInput): Promise<CheckoutIntent> {
-    const appUrl = requireEnv('NEXT_PUBLIC_APP_URL');
+    const appUrl = requireEnv('NEXT_PUBLIC_APP_URL').replace(/\/$/, '');
 
     const checkout = await polar().checkouts.create({
       products: [requireEnv('POLAR_PRODUCT_ID')],
@@ -55,6 +77,10 @@ export const polarRail: PaymentRail = {
         identity_key: input.identityKey,
       },
     });
+
+    if (!checkout.id || !checkout.url) {
+      throw new Error('Polar did not return a checkout URL');
+    }
 
     return { intentId: checkout.id, redirectUrl: checkout.url };
   },

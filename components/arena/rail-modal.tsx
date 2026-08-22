@@ -4,7 +4,7 @@ import { useEffect, useId, useRef } from 'react'
 import { useI18n } from '@/components/locale-provider'
 import { detectArgentinaClient } from '@/lib/rails/select'
 
-export type RailChoice = 'mercadopago' | 'paypal'
+export type RailChoice = 'mercadopago' | 'polar'
 
 /**
  * Payment-rail picker. Opens on the bid CTA so the buyer chooses before any order
@@ -77,22 +77,19 @@ export function RailModal({
     'flex w-full items-center gap-3 rounded-2xl border border-line bg-paper p-4 text-start transition-[scale,border-color,background-color] duration-150 ease-out hover:border-brand hover:bg-mist active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:pointer-events-none disabled:opacity-50'
 
   /*
-   * PayPal decides guest checkout from the buyer's IP. An Argentine buyer sent
-   * to PayPal does not get a card form — they get an account-opening form
-   * asking for DNI and date of birth, and most of them leave. Mercado Pago
-   * takes the same card with no account at all.
-   *
-   * So the order is not cosmetic: whichever option sits first is the one most
-   * people click. Safe to read during render because the modal only mounts
-   * after a click, and the helper guards for a missing navigator.
+   * Polar is the global card rail (USD). Mercado Pago is the Argentine rail
+   * (ARS, local cards and transfers). Order is not cosmetic: whichever option
+   * sits first is the one most people click. Safe to read during render
+   * because the modal only mounts after a click, and the helper guards for a
+   * missing navigator.
    */
   const argentina = detectArgentinaClient()
 
-  const paypal = {
-    rail: 'paypal' as const,
-    badge: 'PP',
-    label: t('railPayPal'),
-    hint: argentina ? t('railPayPalHintAr') : t('railPayPalHint'),
+  const polar = {
+    rail: 'polar' as const,
+    badge: 'P',
+    label: t('railPolar'),
+    hint: argentina ? t('railPolarHintAr') : t('railPolarHint'),
     recommended: !argentina,
   }
   const mercadopago = {
@@ -102,7 +99,7 @@ export function RailModal({
     hint: t('railMercadoPagoHint'),
     recommended: argentina,
   }
-  const options = argentina ? [mercadopago, paypal] : [paypal, mercadopago]
+  const options = argentina ? [mercadopago, polar] : [polar, mercadopago]
 
   return (
     <div
